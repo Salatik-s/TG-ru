@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="fg_push_title">TG-ru</string>
+    <string name="fg_push_connected">Соединено с Telegram</string>
+    <string name="fg_push_connecting">Подключение к Telegram…</string>
+</resources>

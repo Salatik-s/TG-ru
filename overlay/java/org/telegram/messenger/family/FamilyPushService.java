@@ -9,6 +9,9 @@ import android.content.Intent;
 import android.content.pm.ServiceInfo;
 import android.os.Build;
 import android.os.IBinder;
+import android.os.Handler;
+import android.os.Looper;
+import org.telegram.messenger.R;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.URL;
@@ -23,6 +26,19 @@ public final class FamilyPushService extends Service {
     private volatile HttpsURLConnection connection;
     private volatile boolean stopping;
     private Thread readerThread;
+    private final Handler notificationHandler = new Handler(Looper.getMainLooper());
+    private int shownConnectionText;
+    private final Runnable updateNotification = new Runnable() {
+        @Override public void run() {
+            if (stopping) return;
+            int text = telegramConnected() ? R.string.fg_push_connected : R.string.fg_push_connecting;
+            if (text != shownConnectionText) {
+                shownConnectionText = text;
+                getSystemService(NotificationManager.class).notify(SERVICE_ID, serviceNotification(text));
+            }
+            notificationHandler.postDelayed(this, 2_000);
+        }
+    };
     static boolean running() { return instance != null && !instance.stopping; }
     static void updateCredentials() { FamilyPushService s = instance; if (s != null) s.disconnect(); }
 
@@ -30,11 +46,14 @@ public final class FamilyPushService extends Service {
         super.onCreate(); instance = this;
         NotificationManager nm = getSystemService(NotificationManager.class);
         if (Build.VERSION.SDK_INT >= 26) {
-            nm.createNotificationChannel(new NotificationChannel(SERVICE_CHANNEL, "Соединение с семейным сервером", NotificationManager.IMPORTANCE_LOW));
+            // Keep the channel ID: Android preserves the user's existing choices.
+            nm.createNotificationChannel(new NotificationChannel(SERVICE_CHANNEL, getString(R.string.fg_push_title), NotificationManager.IMPORTANCE_LOW));
         }
-        Notification n = notification(SERVICE_CHANNEL, "Семейные уведомления", "Соединение с сервером", true);
+        shownConnectionText = R.string.fg_push_connecting;
+        Notification n = serviceNotification(shownConnectionText);
         if (Build.VERSION.SDK_INT >= 34) startForeground(SERVICE_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING);
         else startForeground(SERVICE_ID, n);
+        notificationHandler.post(updateNotification);
     }
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
@@ -48,10 +67,30 @@ public final class FamilyPushService extends Service {
         b.setSmallIcon(android.R.drawable.stat_notify_chat).setContentTitle(title).setContentText(text)
                 .setVisibility(Notification.VISIBILITY_PRIVATE).setOngoing(ongoing).setOnlyAlertOnce(ongoing)
                 .setCategory(ongoing ? Notification.CATEGORY_SERVICE : Notification.CATEGORY_MESSAGE);
+        if (ongoing) b.setShowWhen(false).setLocalOnly(true).setPriority(Notification.PRIORITY_MIN);
         Intent launch = getPackageManager().getLaunchIntentForPackage(getPackageName());
         if (launch != null) b.setContentIntent(PendingIntent.getActivity(this, ongoing ? 1 : 2, launch, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
         if (!ongoing) b.setAutoCancel(true);
         return b.build();
+    }
+
+    private Notification serviceNotification(int text) {
+        return notification(SERVICE_CHANNEL, getString(R.string.fg_push_title), getString(text), true);
+    }
+
+    /** Telegram's selected account state, not SSE or gateway reachability. */
+    private static boolean telegramConnected() {
+        if (!FamilyPush.authorized()) return false;
+        try {
+            Class<?> users = Class.forName("org.telegram.messenger.UserConfig");
+            Class<?> managers = Class.forName("org.telegram.tgnet.ConnectionsManager");
+            int account = users.getField("selectedAccount").getInt(null);
+            int count = users.getField("MAX_ACCOUNT_COUNT").getInt(null);
+            if (account < 0 || account >= count) return false;
+            Object manager = managers.getMethod("getInstance", int.class).invoke(null, account);
+            int state = ((Number) managers.getMethod("getConnectionState").invoke(manager)).intValue();
+            return state == managers.getField("ConnectionStateConnected").getInt(null);
+        } catch (Exception | LinkageError ignored) { return false; }
     }
 
     private void signal(long id, String event) {
@@ -112,6 +151,6 @@ public final class FamilyPushService extends Service {
     }
 
     private void disconnect() { HttpsURLConnection c = connection; connection = null; if (c != null) c.disconnect(); }
-    @Override public void onDestroy() { stopping = true; disconnect(); if (readerThread != null) readerThread.interrupt(); if (instance == this) instance = null; super.onDestroy(); }
+    @Override public void onDestroy() { stopping = true; notificationHandler.removeCallbacks(updateNotification); disconnect(); if (readerThread != null) readerThread.interrupt(); if (instance == this) instance = null; super.onDestroy(); }
     @Override public IBinder onBind(Intent intent) { return null; }
 }

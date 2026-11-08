@@ -70,4 +70,4 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\deploy\Deploy.ps1
 
 Production-сервер остаётся прежним owner/WSS/VPN baseline. Архив `qa/unreleased/server-transcription`, если присутствует в исходниках, не является инструкцией развёртывания. Не применять старые Whisper/ASR repair-команды к хосту.
 
-iOS/IPA разрешён отдельным этапом после Android. Этот Android Release и его проверка не включают IPA или утверждение об успешном Xcode build.
+iOS/IPA отложен пользователем до отдельного этапа. Текущая работа и Release ограничены Android; iOS workflow и jobs в этом обновлении не запускаются.

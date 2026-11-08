@@ -35,12 +35,14 @@ public final class SavedMediaDiagnostic extends Instrumentation {
     private final AtomicReference<String> observerError = new AtomicReference<>();
     private final AtomicInteger acknowledgedId = new AtomicInteger();
     private String mode="all";
+    private float privacyFontScale=1f;
     private File folder;
     private int notificationId;
     private long began;
     @Override public void onCreate(Bundle arguments) {
         super.onCreate(arguments);
-        String requested=arguments.getString("mode","all");if(requested.matches("photo|features|owner|tools|documents|owner-cycle|finalize|inline|speech|user-voice"))mode=requested;
+        String requested=arguments.getString("mode","all");if(requested.matches("photo|features|owner|tools|documents|owner-cycle|finalize|privacy-render|inline|speech|user-voice"))mode=requested;
+        if(mode.equals("privacy-render")){String scale=arguments.getString("font_scale","1.0");if(!scale.matches("1\\.0|1\\.3|2\\.0"))throw new IllegalArgumentException("Unsupported preview font scale");privacyFontScale=Float.parseFloat(scale);}
         ((Application)getTargetContext().getApplicationContext()).registerActivityLifecycleCallbacks(new Application.ActivityLifecycleCallbacks() {
             public void onActivityResumed(Activity a) {current=a; if(a.getClass().getName().equals("org.telegram.ui.LaunchActivity")) launch=a; }
             public void onActivityCreated(Activity a,Bundle b) {}
@@ -51,6 +53,14 @@ public final class SavedMediaDiagnostic extends Instrumentation {
             public void onActivityDestroyed(Activity a) {}
         });
         start();
+    }
+    @Override public Activity newActivity(ClassLoader loader,String name,Intent intent)throws InstantiationException,IllegalAccessException,ClassNotFoundException{
+        Activity activity=super.newActivity(loader,name,intent);
+        if(mode.equals("privacy-render")&&name.equals("org.telegram.messenger.family.FamilyPrivacyActivity")){
+            android.content.res.Configuration override=new android.content.res.Configuration();override.fontScale=privacyFontScale;
+            activity.applyOverrideConfiguration(override);
+        }
+        return activity;
     }
     @Override public void onStart() {
         Bundle report=new Bundle(); began=SystemClock.elapsedRealtime();
@@ -112,6 +122,7 @@ public final class SavedMediaDiagnostic extends Instrumentation {
             else if(mode.equals("speech")||mode.equals("user-voice")){localSpeech(mode.equals("user-voice"));report.putString("result",mode.equals("user-voice")?"AUTHORIZED_PRIVATE_SAVED_VOICE_LOCAL_NATIVE_BUBBLE_PASSED":"SYSTEM_SPEECH_REAL_SAVED_AUDIO_NATIVE_BUBBLE_PASSED");}
             else if(mode.equals("owner-cycle")){ownerCycle();report.putString("result","OWNER_INVITE_APPROVE_REVOKE_AND_NONOWNER_DENIAL_PASSED");}
             else if(mode.equals("finalize")){finalizeSettings();report.putString("result","SAA_OWNER_UI_AND_ORIGINAL_PLUGIN_CHOICES_PRESERVED_VERIFIED");}
+            else if(mode.equals("privacy-render")){privacyPreview();report.putString("result","PRIVACY_NATIVE_LAYOUT_AND_LOCAL_FONT_OVERRIDE_PASSED");}
             else{if(mode.equals("all")){document("small",128*1024);document("large",12*1024*1024+197);}photo();report.putString("result","SAVED_MESSAGES_MEDIA_ROUNDTRIP_PASSED");}
             report.putInt("tests_passed",mode.equals("all")?3:mode.equals("features")?2:1);
             report.putBoolean("recipient_was_self_only",true);
@@ -450,6 +461,25 @@ public final class SavedMediaDiagnostic extends Instrumentation {
             status("OWNER_REVOCATION_AND_REVOKED_CONFIG_DENIAL_PASSED",0,0);
         }finally{if(id!=null&&!revoked)ownerAction("revoke",id);}
     }
+    private void privacyPreview()throws Exception{
+        guard();ui(()->getTargetContext().startActivity(new Intent().setClassName("com.salatik.familygram","org.telegram.messenger.family.FamilyPrivacyActivity").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)));
+        Activity privacy=waitActivity("FamilyPrivacyActivity");SystemClock.sleep(350);
+        if(Math.abs(privacy.getResources().getConfiguration().fontScale-privacyFontScale)>.01f)throw new Check("ACTIVITY_ONLY_FONT_OVERRIDE_NOT_APPLIED");
+        ui(()->{int[] switches=new int[2];countSwitches(privacy.getWindow().getDecorView(),switches);if(switches[0]!=7)throw new Check("PRIVACY_PREVIEW_CONTROLS_MISSING");checkPrivacyText(privacy.getWindow().getDecorView());int muted=((Number)hidden(privacy,"muted")).intValue(),row=((Number)hidden(privacy,"rowColor")).intValue(),page=((Number)hidden(privacy,"pageColor")).intValue();if(contrast(muted,row)<4.5||contrast(muted,page)<4.5)throw new Check("PRIVACY_MUTED_CONTRAST_FAILED");android.widget.Switch master=(android.widget.Switch)hidden(privacy,"master");int[] off={-android.R.attr.state_checked};int thumb=master.getThumbTintList().getColorForState(off,0),track=master.getTrackTintList().getColorForState(off,0);if(contrast(thumb,track)<3)throw new Check("PRIVACY_OFF_SWITCH_LOW_CONTRAST");});
+        String label="ghost-settings-font"+Math.round(privacyFontScale*100);screenshot(privacy,label+"-top.png");
+        ui(()->{android.widget.ScrollView scroll=privacyScroll(privacy.getWindow().getDecorView());if(scroll==null)throw new Check("PRIVACY_SCROLL_MISSING");scroll.fullScroll(android.view.View.FOCUS_DOWN);});SystemClock.sleep(250);screenshot(privacy,label+"-bottom.png");
+        status("PRIVACY_SEVEN_CONTROLS_UNCLIPPED_AT_LOCAL_FONT_"+Math.round(privacyFontScale*100),0,0);
+        ui(privacy::finish);
+    }
+    private android.widget.ScrollView privacyScroll(android.view.View view){
+        if(view instanceof android.widget.ScrollView)return(android.widget.ScrollView)view;
+        if(view instanceof android.view.ViewGroup){android.view.ViewGroup group=(android.view.ViewGroup)view;for(int i=0;i<group.getChildCount();i++){android.widget.ScrollView result=privacyScroll(group.getChildAt(i));if(result!=null)return result;}}return null;
+    }
+    private void checkPrivacyText(android.view.View view)throws Check{
+        if(view instanceof android.widget.TextView){android.widget.TextView text=(android.widget.TextView)view;android.text.Layout layout=text.getLayout();if(layout!=null&&text.getText().length()>0&&layout.getLineCount()>0&&layout.getLineBottom(layout.getLineCount()-1)>text.getHeight()-text.getPaddingTop()-text.getPaddingBottom()+2)throw new Check("PRIVACY_TEXT_HEIGHT_CLIPPED");}
+        if(view instanceof android.view.ViewGroup){android.view.ViewGroup group=(android.view.ViewGroup)view;for(int i=0;i<group.getChildCount();i++)checkPrivacyText(group.getChildAt(i));}
+    }
+    private double contrast(int first,int second){double a=android.graphics.Color.luminance(first),b=android.graphics.Color.luminance(second);return(Math.max(a,b)+.05)/(Math.min(a,b)+.05);}
     private void finalizeSettings()throws Exception{
         Class<?> tools=cls("org.telegram.messenger.family.FamilyChatTools");Method enabled=tools.getMethod("enabled",android.content.Context.class,String.class),toggle=tools.getMethod("setEnabled",android.content.Context.class,String.class,boolean.class);
         boolean python=(Boolean)enabled.invoke(null,getTargetContext(),"python"),documents=(Boolean)enabled.invoke(null,getTargetContext(),"documents");
@@ -486,7 +516,7 @@ public final class SavedMediaDiagnostic extends Instrumentation {
         Map<?,?> controls=(Map<?,?>)hidden(privacy,"controls");
         String[] flags={"sendReadMessagePackets","sendUploadProgress"};
         for(String flag:flags){Boolean before=(Boolean)privacyType.getMethod("flag",String.class).invoke(null,flag);
-            try{ui(()->((android.widget.Switch)controls.get(flag)).performClick());Boolean after=(Boolean)privacyType.getMethod("flag",String.class).invoke(null,flag);
+            try{ui(()->{android.widget.Switch control=(android.widget.Switch)controls.get(flag);if(flag.equals("sendReadMessagePackets")){android.view.View row=(android.view.View)control.getParent();android.view.accessibility.AccessibilityNodeInfo info=row.createAccessibilityNodeInfo();if(!info.isCheckable()||info.isChecked()!=control.isChecked())throw new Check("PRIVACY_ROW_ACCESSIBILITY_STATE_MISMATCH");row.performClick();}else control.performClick();});Boolean after=(Boolean)privacyType.getMethod("flag",String.class).invoke(null,flag);
                 if(before==null||before.equals(after))throw new Check("PRIVACY_SWITCH_NOT_BOUND_TO_PACKET_FILTER");}
             finally{ui(()->{privacyType.getMethod("setFlag",String.class,boolean.class).invoke(null,flag,before);Method update=privacyType.getDeclaredMethod("update");update.setAccessible(true);update.invoke(privacy);});}
         }

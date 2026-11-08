@@ -6,15 +6,19 @@
 
 ## Проверенная Android-сборка
 
-**0.1.0-preview11** · versionCode **10011** · **150 075 024 байта**. Файл `TG-ru.apk` доступен во вложениях приватного [Release v0.1.0-preview11](https://github.com/Salatik-s/TG-ru/releases/tag/v0.1.0-preview11).
+**0.1.0-preview12** · versionCode **10012** · **150 083 216 байт**. Файл `TG-ru.apk` доступен во вложениях приватного [Release v0.1.0-preview12](https://github.com/Salatik-s/TG-ru/releases/tag/v0.1.0-preview12).
 
 ```text
-SHA-256: 788ae2174ac88ffb433b4ca13e2eafba60f9b2dd303d6edcf66745bbb7bd4659
+SHA-256: c16d553478540f1ccb810f36dbf833d1c18e9b31550758018c2e72d46e72763c
 ```
 
-[Актуальный отчёт APK на телефоне](qa/saved-media/PREVIEW11-RESULT.md). [Исторический preview9](qa/saved-media/PREVIEW9-RESULT.md) хранится отдельно. Preview10 был отладочным и не публиковался. Исходное описание проекта — [docs/PROJECT.md](docs/PROJECT.md); контрольные суммы исходников — [docs/SOURCE-SNAPSHOT.json](docs/SOURCE-SNAPSHOT.json).
+В preview12 обновлены компактные настройки призрака с читаемыми переключателями и тихое служебное уведомление **TG-ru**, отражающее настоящее соединение выбранного аккаунта с Telegram. Все семь прежних контролов, пользовательские значения, пакет и ключ подписи сохранены.
 
-Android Release не содержит IPA. Работа над iOS разрешена отдельно и ведётся отдельным этапом/веткой; готовый IPA этим релизом не заявляется.
+[Финальный отчёт preview12](qa/saved-media/PREVIEW12-RESULT.md) · [Служебное уведомление](docs/NOTIFICATIONS.md) · [Настройки призрака](docs/PRIVACY-SETTINGS.md) · [Проверки целостности](docs/preview12-integrity.json).
+
+Предыдущие [preview11](qa/saved-media/PREVIEW11-RESULT.md) и [preview9](qa/saved-media/PREVIEW9-RESULT.md) сохранены отдельно вместе со своими Release и контрольными суммами. Preview10 был отладочным и не публиковался. Исходное описание проекта — [docs/PROJECT.md](docs/PROJECT.md); контрольные суммы исходников — [docs/SOURCE-SNAPSHOT.json](docs/SOURCE-SNAPSHOT.json).
+
+Android Release не содержит IPA. Дальнейшая работа iOS отложена пользователем; в этом обновлении iOS и CI не изменялись.
 
 ## Что умеет
 
@@ -62,11 +66,19 @@ flowchart LR
 
 | Настройки призрака | Уже установленные дополнения |
 |---|---|
-| <img src="docs/screenshots/ghost-settings.png" width="290" alt="Единые настройки режима призрака и активности" /> | <img src="docs/screenshots/plugins-disabled.png" width="290" alt="Python и документы установлены и выключены" /> |
+| <img src="docs/screenshots/preview12-ghost-settings-font100-top.png" width="290" alt="Единые настройки режима призрака и активности" /> | <img src="docs/screenshots/plugins-disabled.png" width="290" alt="Python и документы установлены и выключены" /> |
 
 | Python: локальный результат под сообщением | PDF: полноэкранный просмотр | DOCX: локальное оформление |
 |---|---|---|
 | <img src="docs/screenshots/python-inline-message.png" width="260" alt="Кнопка Python и локальный результат 2" /> | <img src="docs/screenshots/preview10-pdf-page1.png" width="260" alt="Первая страница тестового PDF" /> | <img src="docs/screenshots/preview10-document-docx.png" width="260" alt="Локально отображённый тестовый DOCX" /> |
+
+### Настройки при увеличенном шрифте
+
+Проверены настоящие семь переключателей, перенос подписей, прокрутка и контраст. При 200% длинный заголовок панели штатно сокращается; названия и пояснения строк доступны полностью через прокрутку.
+
+| Шрифт 100%: нижняя часть | Шрифт 130% | Шрифт 200% |
+|---|---|---|
+| <img src="docs/screenshots/preview12-ghost-settings-font100-bottom.png" width="260" alt="Настройки и пояснения истории при обычном шрифте" /> | <img src="docs/screenshots/preview12-ghost-settings-font130-top.png" width="260" alt="Настройки при шрифте 130 процентов" /> | <img src="docs/screenshots/preview12-ghost-settings-font200-top.png" width="260" alt="Настройки при шрифте 200 процентов" /> |
 
 ### Локальные результаты и штатная транскрипция
 
@@ -117,7 +129,11 @@ APK размером свыше лимита обычного Git хранитс
 
 ## Проверено и что остаётся
 
-Финальная suite Python/context/document прошла за **29 секунд**, навигация и UI владельца — за **5 секунд**. Проверены реальный контекстный запуск в inline-панели без редактора, ошибки/Stop/лимит Python, настоящий PDF pinch выше 150% с повторным render увеличенной ширины, страницы и DOCX zoom; шесть форматов документов открылись. Нативная транскрипция synthetic Opus-записи отображается штатной Telegram-подписью. Проверка temporary non-Premium flag показала кнопку без замка; состояние аккаунта сразу восстановлено.
+**Финальный preview12:** собственное FGS-уведомление проверено по настоящему `telegram_connected=true`, тихому прежнему каналу и служебным флагам. Настройки прошли 100/130/200% font-scale, контраст пояснений ≥4.5 и выключенного thumb/track ≥3, whole-row click и checkable accessibility. Прочтение и набор текста изменяли реальные фильтры, после теста исходные значения восстановлены. Навигация и UI владельца прошли, выбранные плагины сохранены.
+
+Все восемь upstream DEX и 4301 файл assets/lib побайтово совпали с закреплённым preview11. Шесть семейных native-хешей сохранены. Python, ASR, PDF/Office и транспорт не заменялись; их более широкие результаты ниже относятся к preview11.
+
+В preview11 финальная suite Python/context/document прошла за **29 секунд**, навигация и UI владельца — за **5 секунд**. Проверены реальный контекстный запуск в inline-панели без редактора, ошибки/Stop/лимит Python, настоящий PDF pinch выше 150% с повторным render увеличенной ширины, страницы и DOCX zoom; шесть форматов документов открылись. Нативная транскрипция synthetic Opus-записи отображается штатной Telegram-подписью. Проверка temporary non-Premium flag показала кнопку без замка; состояние аккаунта сразу восстановлено.
 
 Системный file-input ASR прошёл на известном Android 15 / AiAi provider при отозванном разрешении микрофона тестового приложения и AppOp IGNORE. Декодер прошёл WAV/AAC/Opus/AVC+AAC MP4, отмену и ошибочные входы; 91 PCM и 25 Office fixtures также прошли. Полные границы и различие candidate/final checks записаны в [отчёте preview11](qa/saved-media/PREVIEW11-RESULT.md).
 

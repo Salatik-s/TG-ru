@@ -1,20 +1,16 @@
-# Проверки Android preview11
+# Проверки Android preview12
 
-Финальный APK: **0.1.0-preview11 / 10011**, 150 075 024 байта.
+Финальный APK: **0.1.0-preview12 / 10012**, **150083216 байт**, SHA-256 `c16d553478540f1ccb810f36dbf833d1c18e9b31550758018c2e72d46e72763c`.
 
-SHA-256: `788ae2174ac88ffb433b4ca13e2eafba60f9b2dd303d6edcf66745bbb7bd4659`.
+Основной отчёт: [PREVIEW12-RESULT.md](../qa/saved-media/PREVIEW12-RESULT.md). Машинные метаданные: [preview12-integrity.json](preview12-integrity.json).
 
-Основной отчёт: [PREVIEW11-RESULT.md](../qa/saved-media/PREVIEW11-RESULT.md). Он различает финальный APK, ранее проверенный candidate с неизменёнными runtime/decoder и исторический baseline.
+- Собственное служебное уведомление: настоящее connected state, TG-ru, прежний тихий канал, FGS/ongoing/localOnly/onlyAlertOnce, без времени. `OWN_NOTIFICATION_PASS`.
+- Итоговая privacy UI: семь переключателей при 100/130/200% шрифта, без обрезания текста строк, с прокруткой. Контраст вторичного текста ≥4.5, выключенного thumb/track ≥3.
+- Настоящий whole-row click и отдельный switch изменяют реальные read/typing-фильтры; исходные значения восстановлены. Accessibility checked state совпадает с контролом.
+- TG-ru / S.A.A., меню, плагины, UI владельца и системный раздел подтверждены. Пользовательские значения дополнений сохранены.
+- Прежняя v2/v3 подпись, ZIP alignment 16 KiB, 23937 public resource IDs, десять DEX / 63666 уникальных классов.
+- Все восемь upstream DEX и 4301 файл assets/lib совпали с preview11, все шесть семейных native-хешей сохранены. Транспорт, Python/WASM, ASR и документы не подменялись.
 
-- Финальный Python/context/document прогон: 29 секунд. Context Run работает в сообщении без редактора; sandbox, ошибки и десятисекундный timeout прошли.
-- Настоящий PDF pinch выше 150%, повышенная ширина повторного bitmap render, fit-page и переходы страниц прошли. Форматированный DOCX WebView загрузился, native zoom увеличил scale; DOCX/DOC/ODT/RTF/TXT fixtures прошли.
-- Штатная транскрипция synthetic Opus voice показала native Telegram bubble. Non-Premium visibility проверена с немедленным восстановлением флага; Premium RPC не использовался.
-- Системный file-input RU прошёл с runtime RECORD_AUDIO revoked и UID mic AppOp IGNORE у отдельного test-only пакета. Это известная Android 15 / AiAi-конфигурация, не универсальный результат.
-- 91 PCM fixture, 25 Office fixtures и настоящие WAV/AAC/Opus/AVC+AAC MP4 codec checks прошли; cancel/corrupt/no-audio отказы проверены.
-- Финальная навигация и owner UI: пять секунд. Пользовательские включённые/выключенные плагины сохранены; fresh-install default остаётся off.
+Более широкие проверки [preview11](../qa/saved-media/PREVIEW11-RESULT.md) и [preview9](../qa/saved-media/PREVIEW9-RESULT.md) сохранены исторически и не выдаются за заново выполненные для preview12.
 
-Исторические неизменённые сетевые, медиапередачи, owner-cycle и history проверки сохранены в [PREVIEW9-RESULT.md](../qa/saved-media/PREVIEW9-RESULT.md); они не выдаются за повторённые для preview11. Хост не обновлялся, remote ASR/Whisper не развёртывались.
-
-Скриншоты публикуются только для собственных synthetic fixtures. Личные записи, лица, переписки, транскрипты, коды и ключи не включены. Подробнее: [NATIVE-SPEECH.md](NATIVE-SPEECH.md), [OFFICE.md](OFFICE.md).
-
-Звонки с собеседником, все сторонние VPN, длительная фоновая доставка и другие устройства остаются за границей этих проверок. Android Release не содержит IPA.
+Ни iOS, ни GitHub Actions, ни сервер в этом обновлении не изменялись. Настройки системной защиты и исключения не менялись. Личные чаты/уведомления и записи в отчёт не извлекались. Длительное фоновое поведение, другие устройства и все внешние VPN остаются за границей короткого прогона.

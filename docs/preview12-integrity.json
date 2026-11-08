@@ -1,0 +1,15 @@
+{
+  "version_code": 10012,
+  "version_name": "0.1.0-preview12",
+  "apk_sha256": "c16d553478540f1ccb810f36dbf833d1c18e9b31550758018c2e72d46e72763c",
+  "apk_bytes": 150083216,
+  "resource_ids": 23937,
+  "dex": {
+    "dex_files": 10,
+    "unique_classes": 63666
+  },
+  "unchanged_native_and_runtime_files": 4301,
+  "preview11_native_hashes_preserved": true,
+  "native_and_runtime_unchanged": true,
+  "unchanged_upstream_dex_files": 8
+}
