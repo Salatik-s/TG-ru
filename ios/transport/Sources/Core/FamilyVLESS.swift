@@ -23,7 +23,13 @@ public enum FamilyVLESS {
 
     /// VLESS v0, no addons / Vision, TCP destination. WSS supplies authenticated TLS.
     public static func request(uuid: UUID, host: String, port: UInt16) throws -> Data {
-        guard port != 0, !host.isEmpty, host.utf8.count <= 253 else { throw FamilyTransportError.invalidDestination }
+        // Validate the complete Swift string before the C API: inet_pton may accept
+        // platform extensions and a NUL suffix would otherwise be silently truncated.
+        guard port != 0, !host.isEmpty, host.utf8.count <= 253,
+              host.utf8.allSatisfy({ byte in
+                  (48...57).contains(byte) || (65...90).contains(byte) || (97...122).contains(byte)
+                      || byte == 45 || byte == 46 || byte == 58
+              }) else { throw FamilyTransportError.invalidDestination }
         var identity = uuid.uuid
         var result = Data([0])
         withUnsafeBytes(of: &identity) { result.append(contentsOf: $0) }

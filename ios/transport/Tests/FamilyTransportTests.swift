@@ -13,8 +13,8 @@ final class FamilyTransportTests: XCTestCase {
         let domain = try FamilyVLESS.request(uuid: uuid, host: "dc.example", port: 5222)
         XCTAssertEqual(Array(domain.suffix(12)), [2,10] + Array("dc.example".utf8))
         XCTAssertNotEqual(v4, try FamilyVLESS.request(uuid: uuid, host: "149.154.175.50", port: 443))
-        for host in ["", "bad host", "host/path", "a..b", "a\u{0}b", "[::1]", "fe80::1%en0", "-label.example"] {
-            XCTAssertThrowsError(try FamilyVLESS.request(uuid: uuid, host: host, port: 443))
+        for host in ["", "bad host", "host/path", "a..b", "a\u{0}b", "[::1]", "fe80::1%en0", "-label.example", "149.154.167.51\u{0}.example"] {
+            XCTAssertThrowsError(try FamilyVLESS.request(uuid: uuid, host: host, port: 443), "Accepted malformed fixture \(host.debugDescription)")
         }
         XCTAssertThrowsError(try FamilyVLESS.request(uuid: uuid, host: "localhost", port: 0))
     }
