@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "repository": "https://github.com/TelegramMessenger/Telegram-iOS.git",
+  "commit": "24638bc69bd083981b178dd1e7f921eebbf7fc46",
+  "app_version": "13.2",
+  "xcode_version": "27.1",
+  "xcode_build": "27A9275",
+  "macos_major": "27",
+  "bazel_version": "9.2.0",
+  "bazel_sha256": "dd466352a3e4d3581b8898740ee1ff208866ccbe25f8d367c5dcb950219587e6",
+  "rules_apple_commit": "485016eb5b0948cc17307064e7977a6d68e94046",
+  "files": {
+    "MODULE.bazel": "8c10a1132d0cc38f0a40dcf8505ad0d1d15dfcb3fe7c4922e6d261ea0d3c4a78",
+    "Telegram/BUILD": "3fad60336364ae1aa7f38d8a3f60b9fb524a8f3ea3336778a66047f71d06f50a",
+    "build-system/Make/BazelLocation.py": "bf92d0abc699dbccec569c03658816d61a02e61075f7febb5865c54042c43518",
+    "build-system/Make/BuildConfiguration.py": "c6005d4cd8c3ebdc617781e180a2abd14335089628d9f2b16b321b3d3261e3a6",
+    "build-system/Make/BuildEnvironment.py": "7264d20c9b5775c7bacba502a1a50787530cedcd01661f739da6179c365a0e3c",
+    "build-system/Make/Make.py": "32bfd513e294438297ec9d252cd5d3b02442afe9f2b5d46538b8d45bd07a85f7",
+    "submodules/PasscodeCore/Sources/Passcode.swift": "2cdb37c32d9d6bccad30b9a3c6460abf67e29c66180e6dc7430937ea35accc8a",
+    "submodules/TelegramUI/Sources/AppDelegate.swift": "7863b2208bf6cf10fb6427815fc25a4a5b4ff1a5673e351d39a449c5607916df"
+  }
+}
