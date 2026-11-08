@@ -1,0 +1,28 @@
+FamilyGram private call transport adapter
+
+The native library incorporates xHook source and statically linked Android
+NDK C++ runtime components. Preserve the following notices when distributing
+the library. Reference snapshots are used for audit, not compiled into it.
+
+xHook: iQIYI, Inc., commit 391d0c4103626bf39d54a1d9c7a10965c82ff8d2
+https://github.com/iqiyi/xHook
+MIT and BSD notices: licenses/xHook.txt (also third_party/xhook/LICENSE).
+Local modification: xh_util.c determines page size using sysconf at runtime.
+
+Android NDK r27c runtime/toolchain components
+Bundled upstream notices, including LLVM/libc++ license and exceptions:
+licenses/NDK-toolchain.txt. This includes the full upstream toolchain notice
+bundle; it does not imply every listed component is linked into this library.
+
+Pinned Telegram client source reference snapshots:
+https://github.com/exteraless/exteraless/tree/c83765c4151d50ba514325ddf0a3262769729dc6
+VoIPService.java: GPL version 2 or later, licenses/Telegram-GPL.txt.
+NetworkSocketPosix.cpp: libtgvoip Unlicense, licenses/libtgvoip-Unlicense.txt.
+physical_socket_server.cc/.h and android_network_monitor.cc:
+Copyright the WebRTC Project Authors; licenses/WebRTC-BSD.txt and
+licenses/WebRTC-PATENTS.txt. The client snapshot omits the root WebRTC license;
+these standard notices were retrieved from the official webrtc-mirror/webrtc
+repository on 2026-11-08. Original file copyright headers remain intact.
+
+Source hashes and original ELF build IDs: source-lock.json.
+The Go transport has separate notices in ../tunnel/THIRD_PARTY_NOTICES.txt.

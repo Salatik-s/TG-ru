@@ -1,0 +1,6 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.salatik.familygram.qa">
+    <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="35" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <application android:label="FamilyGram QA instrumentation" android:testOnly="true" android:allowBackup="false" />
+    <instrumentation android:name="com.salatik.familygram.qa.FamilyInstrumentation" android:targetPackage="com.salatik.familygram" android:functionalTest="true" android:handleProfiling="false" />
+</manifest>

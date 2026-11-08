@@ -1,0 +1,55 @@
+name: familygram
+services:
+  access:
+    image: node:24-bookworm-slim@sha256:c0a93797ee78814ae6d32fcca2561fdbbe423149c3f5389aad32d86e9fd85bd4
+    working_dir: /app
+    user: "10001:10001"
+    command: [node, main.mjs]
+    restart: unless-stopped
+    init: true
+    environment:
+      DATA_DIR: /data
+      TRUST_PROXY: "1"
+    ports:
+      - "18443:18443/tcp"
+    volumes:
+      - /opt/familygram/data:/data
+      - ../server:/app:ro
+      - ../runtime/xray:/usr/local/bin/xray:ro
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:8080/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: ${FAMILYGRAM_START_PERIOD:-40m}
+    logging:
+      driver: json-file
+      options: {max-size: "5m", max-file: "2"}
+  tls:
+    image: nginx:1.28-alpine@sha256:0dcc88822d45581e65ae329f8be769762bf628d3b2bb7d2a077d4aa5c98b30e3
+    restart: unless-stopped
+    depends_on:
+      access: {condition: service_healthy}
+    ports:
+      - "8443:8443/tcp"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - "${FAMILYGRAM_CERT_LIVE:?certificate required}:/etc/letsencrypt/live/24projects.ru:ro"
+      - "${FAMILYGRAM_CERT_ARCHIVE:?certificate required}:/etc/letsencrypt/archive/${FAMILYGRAM_CERT_NAME:?certificate name required}:ro"
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx:size=8m
+      - /var/run:size=1m
+    cap_drop: [ALL]
+    cap_add: [SETUID, SETGID, CHOWN]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    logging:
+      driver: json-file
+      options: {max-size: "5m", max-file: "2"}

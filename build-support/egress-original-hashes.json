@@ -1,0 +1,7 @@
+{
+  "server/main.mjs": "f0fee6827d8b489c518c8bbd42bf4cfa4f0bb2f4896807c56da472a23a885295",
+  "server/gateway.mjs": "a777df925b9de407c61577e799fac274dd660eb4cea5bc5b438c1ffb90ed59f7",
+  "deploy/install.sh": "a86b032314994a2cfe5982aef67e8fd30f138464ba5eef30fbd52f22285d8edb",
+  "deploy/compose.yaml": "1f67b2a1a28a875a73bbe4f9a66b76ce99888ad0378e2d8373cfa46f990e2410",
+  "deploy/Deploy.ps1": "791ce6509a7073f073b587d292366118a86bee22a8de75ed50bedc706643b6fa"
+}

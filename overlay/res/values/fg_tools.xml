@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="fg_builtin_intro">Дополнения уже установлены. Включите нужное — дополнительные загрузки не требуются.</string>
+  <string name="fg_builtin_enabled">Установлено · включено</string>
+  <string name="fg_builtin_disabled">Установлено · выключено</string>
+  <string name="fg_builtin_enable_first">Сначала включите дополнение</string>
+  <string name="fg_other_plugins">Другие плагины и установка из файла</string>
+  <string name="fg_python_runner">Python в чате</string>
+  <string name="fg_python_summary">Запускайте Python из меню сообщения с блоком кода. Код работает локально, без сети и доступа к Telegram. Лимит: 5 секунд, память до 256 МБ.</string>
+  <string name="fg_python_code">Код Python</string>
+  <string name="fg_python_input">Ввод для input() · по одной строке</string>
+  <string name="fg_python_run">Запустить</string>
+  <string name="fg_python_stop">Остановить</string>
+  <string name="fg_python_loading">Запускаем локальный Python…</string>
+  <string name="fg_python_ready">Готово. Нажмите «Запустить», чтобы выполнить код.</string>
+  <string name="fg_python_running">Код выполняется…</string>
+  <string name="fg_python_timeout">Выполнение остановлено: превышен лимит времени.</string>
+  <string name="fg_python_memory_error">Python остановлен: не хватило памяти. Откройте дополнение заново.</string>
+  <string name="fg_python_failed">Не удалось запустить Python. Откройте дополнение заново.</string>
+  <string name="fg_python_cancelled">Выполнение остановлено</string>
+  <string name="fg_python_code_limit">Код слишком большой: максимум 64 КБ</string>
+  <string name="fg_python_menu">Запустить Python</string>
+  <string name="fg_python_block">Блок кода %1$d</string>
+  <string name="fg_python_choose">Выберите блок Python</string>
+  <string name="fg_python_open">Открыть редактор Python</string>
+  <string name="fg_documents_title">Просмотр документов</string>
+  <string name="fg_documents_summary">PDF, Word DOC/DOCX, ODT, RTF и текстовые файлы открываются внутри приложения. Обработка на телефоне, без отправки документов на сторонние сайты.</string>
+  <string name="fg_documents_size_limit">Для встроенного просмотра выберите файл до 32 МБ</string>
+  <string name="fg_documents_error">Не удалось открыть документ. Файл может быть повреждён или защищён паролем.</string>
+  <string name="fg_documents_loading">Открываем документ…</string>
+  <string name="fg_documents_page">Страница %1$d из %2$d</string>
+  <string name="fg_documents_next">Следующая страница</string>
+  <string name="fg_documents_previous">Предыдущая страница</string>
+  <string name="fg_documents_text_notice">Текстовый просмотр. Сложное оформление Word может отличаться от оригинала.</string>
+  <string name="fg_documents_truncated">Показаны первые 200 000 символов документа</string>
+</resources>

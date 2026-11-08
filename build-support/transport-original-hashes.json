@@ -1,0 +1,7 @@
+{
+  "server/gateway.mjs": "fd99641559f13a870d891221defc0da5b84149940fac503c7ff80c098552c109",
+  "server/http.mjs": "9bd71d38525374a93bb07fc5b2dba948cd37d1d143a408d1ab7dd558245506cb",
+  "deploy/nginx.conf": "a6a47ef9c621a9ca7b313f6cd6f4839157773f0d10d6df57caff9c79be54b100",
+  "deploy/install.sh": "02769ed1e8b1f6c250574d4b70a995319efbb7c5c77eec7815adac9024757f05",
+  "deploy/verify-egress.mjs": "c3ba592a8a2ad71b45ea0a858ad7a8ec41ca80bb6b5a45470836bf1f2428f15d"
+}

@@ -1,0 +1,6 @@
+/out/
+*.test
+*.exe
+*.so
+*.dll
+*.private.json

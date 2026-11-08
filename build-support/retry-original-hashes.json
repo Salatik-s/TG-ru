@@ -1,0 +1,5 @@
+{
+  "deploy/install.sh": "b4165d28ef76ac51fe75c4bf72ad2f5d7698ab3b1a3dd65f6fbe3288523408ac",
+  "deploy/compose.yaml": "298c93bca441b99afe1fdf1cec3cb2134c459fa8628e56607ab59bdebaf8371f",
+  "deploy/Deploy.ps1": "791ce6509a7073f073b587d292366118a86bee22a8de75ed50bedc706643b6fa"
+}

@@ -1,0 +1,118 @@
+diff --git a/calls/CMakeLists.txt b/calls/CMakeLists.txt
+index e2963f5..cb32bbd 100644
+--- a/calls/CMakeLists.txt
++++ b/calls/CMakeLists.txt
+@@ -12,5 +12,8 @@ target_link_libraries(familycalls PRIVATE log dl)
+ add_executable(fgcalls-adapter-smoke tests/adapter_smoke.cc adapter.cc syscall_gate.S)
+ target_link_libraries(fgcalls-adapter-smoke PRIVATE dl)
+ target_compile_options(fgcalls-adapter-smoke PRIVATE -Wall -Wextra -Werror)
++add_executable(fgcalls-tcp-drain tests/tcp_drain.cc adapter.cc syscall_gate.S)
++target_link_libraries(fgcalls-tcp-drain PRIVATE dl)
++target_compile_options(fgcalls-tcp-drain PRIVATE -Wall -Wextra -Werror)
+ add_executable(fgcalls-audit tests/audit.cc)
+ target_link_libraries(fgcalls-audit PRIVATE dl)
+diff --git a/calls/adapter.cc b/calls/adapter.cc
+index 4828960..56edb86 100644
+--- a/calls/adapter.cc
++++ b/calls/adapter.cc
+@@ -62,7 +62,7 @@ int output_address(const Address &in, sockaddr *out, socklen_t *length) {
+ struct Route { int fd; Address address; };
+ struct Socket {
+     int domain, kind, peer;
+-    std::atomic<bool> dead{false}, connected{false}, application_closed{false};
++    std::atomic<bool> dead{false}, connected{false}, application_closed{false}, read_shutdown{false};
+     std::mutex mutex, fd_mutex;
+     Address local, remote;
+     std::map<std::string, Route> routes;
+@@ -90,8 +90,10 @@ bool live(const std::shared_ptr<Socket> &socket) {
+ void release(int fd) { transport.release(fd); ::close(fd); }
+ struct Frame { uint32_t magic; uint16_t address_length; uint16_t reserved; sockaddr_storage address; };
+ constexpr uint32_t kMagic = 0x46474331;
+-void finish(const std::shared_ptr<Socket> &socket) {
+-    socket->dead = true;
++void finish(const std::shared_ptr<Socket> &socket, bool graceful = false) {
++    // Ordinary TCP EOF must leave queued application bytes readable. Revocation
++    // and errors still mark the socket dead, preserving the fail-closed gate.
++    if (!graceful) socket->dead = true;
+     std::lock_guard<std::mutex> lock(socket->mutex);
+     if (socket->stream >= 0) { release(socket->stream); socket->stream = -1; }
+     for (auto &entry : socket->routes) release(entry.second.fd);
+@@ -153,10 +155,10 @@ void udp_worker(std::shared_ptr<Socket> socket) {
+     finish(socket);
+ }
+ struct Buffer { unsigned char bytes[kBuffer]; size_t begin = 0, end = 0; bool empty() const { return begin == end; } };
+-bool read_buffer(int fd, Buffer &buffer) {
++bool read_buffer(int fd, Buffer &buffer, bool &eof) {
+     if (!buffer.empty()) return true;
+     ssize_t n = ::recv(fd, buffer.bytes, sizeof(buffer.bytes), MSG_DONTWAIT);
+-    if (n == 0) return false;
++    if (n == 0) { eof = true; return true; }
+     if (n < 0) return errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR;
+     buffer.begin = 0; buffer.end = n; return true;
+ }
+@@ -168,21 +170,38 @@ bool write_buffer(int fd, Buffer &buffer) {
+ }
+ void tcp_worker(std::shared_ptr<Socket> socket) {
+     Buffer outbound{}, inbound{};
++    bool outbound_eof = false, inbound_eof = false;
++    bool outbound_shutdown = false, inbound_shutdown = false;
++    bool graceful = false;
+     while (live(socket)) {
+         int stream;
+         { std::lock_guard<std::mutex> lock(socket->mutex); stream = socket->stream; }
+         if (stream < 0) { ::poll(nullptr, 0, 25); continue; }
+-        pollfd fds[2] = {{socket->peer, static_cast<short>((outbound.empty() ? POLLIN : 0) | (!inbound.empty() ? POLLOUT : 0)), 0},
+-                         {stream, static_cast<short>((inbound.empty() ? POLLIN : 0) | (!outbound.empty() ? POLLOUT : 0)), 0}};
++        short app_events = (outbound.empty() && !outbound_eof ? POLLIN : 0) | (!inbound.empty() ? POLLOUT : 0);
++        short remote_events = (inbound.empty() && !inbound_eof ? POLLIN : 0) | (!outbound.empty() ? POLLOUT : 0);
++        // A fully drained half is omitted: poll reports HUP even with events=0.
++        pollfd fds[2] = {{app_events ? socket->peer : -1, app_events, 0},
++                         {remote_events ? stream : -1, remote_events, 0}};
+         if (::poll(fds, 2, 50) < 0) { if (errno == EINTR) continue; break; }
+         if (!live(socket)) break;
+         if ((fds[0].revents | fds[1].revents) & (POLLERR | POLLNVAL)) break;
+-        if ((fds[0].revents & POLLIN) && !read_buffer(socket->peer, outbound)) break;
+-        if ((fds[1].revents & POLLIN) && !read_buffer(stream, inbound)) break;
++        // HUP is only a prompt to drain, not proof that recv has reached EOF.
++        if (!outbound_eof && (fds[0].revents & (POLLIN | POLLHUP)) && !read_buffer(socket->peer, outbound, outbound_eof)) break;
++        if (!inbound_eof && (fds[1].revents & (POLLIN | POLLHUP)) && !read_buffer(stream, inbound, inbound_eof)) break;
++        // SHUT_RD discards inbound bytes without aborting the writable half.
++        if (socket->read_shutdown) inbound.begin = inbound.end;
+         if (!write_buffer(stream, outbound) || !write_buffer(socket->peer, inbound)) break;
+-        if ((fds[0].revents | fds[1].revents) & POLLHUP) break;
++        if (outbound_eof && outbound.empty() && !outbound_shutdown) {
++            if (::shutdown(stream, SHUT_WR) != 0) break;
++            outbound_shutdown = true;
++        }
++        if (inbound_eof && inbound.empty() && !inbound_shutdown) {
++            if (::shutdown(socket->peer, SHUT_WR) != 0) break;
++            inbound_shutdown = true;
++        }
++        if (outbound_shutdown && inbound_shutdown) { graceful = true; break; }
+     }
+-    finish(socket);
++    finish(socket, graceful);
+ }
+ int fail() { errno = ENETDOWN; return -1; }
+ }
+@@ -281,7 +300,19 @@ extern "C" int FGC_getsockopt(int fd,int level,int option,void *value,socklen_t
+ }
+ extern "C" int FGC_listen(int fd,int backlog) { if (find(fd) || internet_fd(fd)) { errno=EOPNOTSUPP; return -1; } return ::listen(fd,backlog); }
+ extern "C" int FGC_accept(int fd,sockaddr *address,socklen_t *length) { if (find(fd) || internet_fd(fd)) return fail(); return ::accept(fd,address,length); }
+-extern "C" int FGC_shutdown(int fd,int how) { auto socket=find(fd);if(!socket)return internet_fd(fd) ? fail() : ::shutdown(fd,how);std::lock_guard<std::mutex> operation(socket->fd_mutex);if(socket->application_closed){errno=EBADF;return -1;}socket->dead=true;return ::shutdown(fd,how); }
++extern "C" int FGC_shutdown(int fd,int how) {
++    auto socket=find(fd);if(!socket)return internet_fd(fd) ? fail() : ::shutdown(fd,how);
++    std::lock_guard<std::mutex> operation(socket->fd_mutex);
++    if(socket->application_closed){errno=EBADF;return -1;}
++    if(how!=SHUT_RD && how!=SHUT_WR && how!=SHUT_RDWR){errno=EINVAL;return -1;}
++    if(!live(socket))return -1;
++    int result=::shutdown(fd,how);
++    if(result==0){
++        if(socket->kind!=SOCK_STREAM || how==SHUT_RDWR)socket->dead=true;
++        else if(how==SHUT_RD)socket->read_shutdown=true;
++    }
++    return result;
++}
+ extern "C" int FGC_close(int fd) {
+     std::shared_ptr<Socket> socket;
+     { std::lock_guard<std::mutex> lock(sockets_mutex); auto it=sockets.find(fd); if(it!=sockets.end()){socket=it->second;socket->dead=true;sockets.erase(it);} }

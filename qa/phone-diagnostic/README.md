@@ -1,0 +1,11 @@
+# Cold-process reflection inspector
+
+**Do not use this to inspect the currently spinning login request.** `am instrument` starts the target under instrumentation and ordinarily kills its previous process. That destroys the old pending-request map and in-memory lease. Capture ordinary adb logcat/dumpsys evidence first. This inspector reports its PID and explicitly labels its output as a new process.
+
+The separate testOnly APK is signed by the existing FamilyGram key. The current runner launches the ordinary launcher alias; FamilyGate performs its normal production authorization and normal Telegram initialization follows. It samples changes every five seconds for 120 seconds. The inspector itself does not invoke account initialization/getInstance, send Telegram API requests, enter a phone number, change TLS, update preferences, modify access leases, or read keys, tokens, phone numbers, user IDs or gateway profile data. Normal application behavior, including existing-account synchronization and normal lease refresh, continues unchanged.
+
+Output contains allowlisted FamilyAccess status/error, native readiness and lease booleans; network state; stageQueue responsiveness (a benign posted Runnable); and existing managers' numeric pause/resume/DC/connection state and pending callback counts. The native auth-key getter is reduced immediately to a boolean; its numeric value is never retained in a report or printed. No chat view, account identity, callback payload, phone number or raw error string is inspected.
+
+Build with `python build.py`; sign the unsigned APK with the existing `build-support/Sign.ps1`. No script automatically installs or runs this on a physical device. Root coordinates any authorized installation and cold-process diagnostic using an explicit device serial. Production APK/data must not be cleared or reinstalled.
+
+Initial samples can show applicationInited=false, no fresh approval lease and zero Java manager instances; later samples should follow the genuine Gate → Launch path. Neither initial values nor the final report establish what the prior foreground process was doing. Instrumentation completion normally ends its target process; root can reopen the app normally afterwards. No app data is cleared, and the production APK is not reinstalled.

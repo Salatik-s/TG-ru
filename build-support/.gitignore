@@ -1,0 +1,8 @@
+__pycache__/
+guard-typecheck/
+smali-fixtures/
+*.dex
+apktool_*.jar
+apktool_*.jar.parts/
+work-*/
+owner-phone-id.txt

@@ -1,0 +1,15 @@
+* text=auto
+*.sh text eol=lf
+*.mjs text eol=lf
+*.go text eol=lf
+*.py text eol=lf
+*.java text eol=lf
+*.cpp text eol=lf
+*.h text eol=lf
+*.ps1 text eol=crlf
+*.apk binary
+*.ipa binary
+*.a binary
+*.so binary
+*.jar binary
+*.png binary

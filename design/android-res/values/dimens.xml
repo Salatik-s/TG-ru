@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="fg_space_xs">4dp</dimen>
+    <dimen name="fg_space_sm">8dp</dimen>
+    <dimen name="fg_space_md">12dp</dimen>
+    <dimen name="fg_space_lg">16dp</dimen>
+    <dimen name="fg_space_xl">24dp</dimen>
+    <dimen name="fg_space_xxl">32dp</dimen>
+    <dimen name="fg_touch_min">48dp</dimen>
+    <dimen name="fg_setting_min_height">64dp</dimen>
+    <dimen name="fg_input_min_height">56dp</dimen>
+    <dimen name="fg_icon_size">24dp</dimen>
+    <dimen name="fg_input_radius">12dp</dimen>
+    <dimen name="fg_button_radius">24dp</dimen>
+    <dimen name="fg_content_max_width">600dp</dimen>
+    <dimen name="fg_type_headline_small">24sp</dimen>
+    <dimen name="fg_line_headline_small">32sp</dimen>
+    <dimen name="fg_type_title_large">22sp</dimen>
+    <dimen name="fg_line_title_large">28sp</dimen>
+    <dimen name="fg_type_title_medium">16sp</dimen>
+    <dimen name="fg_line_title_medium">24sp</dimen>
+    <dimen name="fg_type_body_large">16sp</dimen>
+    <dimen name="fg_line_body_large">24sp</dimen>
+    <dimen name="fg_type_body_medium">14sp</dimen>
+    <dimen name="fg_line_body_medium">20sp</dimen>
+    <dimen name="fg_type_label_large">14sp</dimen>
+    <dimen name="fg_line_label_large">20sp</dimen>
+    <dimen name="fg_type_label_small">12sp</dimen>
+    <dimen name="fg_line_label_small">16sp</dimen>
+</resources>

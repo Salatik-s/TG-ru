@@ -1,0 +1,22 @@
+<!doctype html><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; connect-src 'self'; worker-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Local Python worker</title>
+<script>
+'use strict';
+let worker=null,timer=null;
+function emit(type,text){console.log('SAA_RUNNER:'+JSON.stringify({type,text:String(text||'').slice(0,65536)}));}
+function stopRun(){clearTimeout(timer);if(worker){worker.terminate();worker=null;}}
+function executePython(payload){
+  stopRun();worker=new Worker('/runner/worker.mjs',{type:'module'});
+  timer=setTimeout(()=>{stopRun();emit('result','Не удалось запустить Python. Обновите Android System WebView и повторите.');},20000);
+  worker.onmessage=({data})=>{
+    if(!data||typeof data.type!=='string')return;
+    if(data.type==='ready'){
+      clearTimeout(timer);timer=setTimeout(()=>{stopRun();emit('result','Выполнение остановлено: превышен лимит 5 секунд.');},5000);
+      worker.postMessage(payload);emit('running','');
+    }else if(data.type==='result'){const text=data.text;stopRun();emit('result',text);}
+  };
+  worker.onerror=()=>{stopRun();emit('result','Не удалось выполнить код. Проверьте поддержку WebAssembly в Android System WebView.');};
+  emit('loading','');
+}
+</script>

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="fg_family_settings">Семейные настройки</string>
+  <string name="fg_connection">Подключение</string>
+  <string name="fg_plugins">Плагины</string>
+  <string name="fg_security">Безопасность</string>
+  <string name="fg_join_title">Подключение к семье</string>
+  <string name="fg_join_heading">Добавьте это устройство</string>
+  <string name="fg_service_address">Адрес семейного сервиса</string>
+  <string name="fg_device_name">Имя устройства</string>
+  <string name="fg_request_access">Отправить заявку</string>
+  <string name="fg_invite_not_valid">Приглашение недействительно. Проверьте код или получите новое.</string>
+  <string name="fg_device_blocked">Подключение устройства заблокировано</string>
+  <string name="fg_contact_access_owner">Обратитесь к участнику, который управляет доступом.</string>
+  <string name="fg_too_many_attempts">Слишком много попыток. Повторите позже.</string>
+  <string name="fg_device_proof_failed">Не удалось подтвердить устройство</string>
+  <string name="fg_waiting_title">Ожидаем одобрения</string>
+  <string name="fg_waiting_description">Заявка отправлена. Попросите подтвердить это устройство — после одобрения откроется Telegram.</string>
+  <string name="fg_check_status">Проверить статус</string>
+  <string name="fg_device_approved">Устройство одобрено</string>
+  <string name="fg_no_fresh_data">Нет свежих данных</string>
+  <string name="fg_privacy_title">Дополнительная приватность</string>
+  <string name="fg_local_history">Локальная история</string>
+  <string name="fg_access_revoked">Семейный доступ отозван</string>
+</resources>

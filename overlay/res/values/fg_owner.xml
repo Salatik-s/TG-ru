@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="fg_save_deleted_switch">Сохранять удалённые сообщения</string>
+  <string name="fg_save_deleted_limit">История хранится на этом телефоне. Сохраняются сообщения, которые приложение успело получить до удаления. Старые удалённые сообщения восстановить нельзя.</string>
+  <string name="fg_owner_devices">Устройства семьи</string>
+  <string name="fg_owner_summary">Приглашения и доступ · только с вашего телефона</string>
+  <string name="fg_owner_explanation">Создайте приглашение для нового телефона. После ввода кода сравните отпечатки устройств и подтвердите доступ здесь.</string>
+  <string name="fg_owner_create_invite">Создать приглашение на 24 часа</string>
+  <string name="fg_owner_invite_hint">Каждое приглашение подходит для одного нового устройства.</string>
+  <string name="fg_owner_copy_invite">Скопировать приглашение</string>
+  <string name="fg_owner_invitation">Приглашение</string>
+  <string name="fg_owner_refresh">Обновить список устройств</string>
+  <string name="fg_owner_loading">Проверяем доступ и загружаем данные…</string>
+  <string name="fg_owner_verified">Данные получены с семейного сервера</string>
+  <string name="fg_owner_truncated">Показаны последние 50 устройств</string>
+  <string name="fg_owner_invite_display">%1$s\n\nДействует 24 часа. После ввода кода новый телефон появится в списке для подтверждения.</string>
+  <string name="fg_owner_invite_created">Одноразовое приглашение создано</string>
+  <string name="fg_owner_done">Доступ обновлён</string>
+  <string name="fg_owner_empty">Новых заявок пока нет</string>
+  <string name="fg_owner_this_phone">Ваш телефон · управление доступом</string>
+  <string name="fg_owner_pending">Ожидает подтверждения</string>
+  <string name="fg_owner_approved">Доступ разрешён</string>
+  <string name="fg_owner_blocked">Устройство заблокировано</string>
+  <string name="fg_owner_revoked">Доступ отозван</string>
+  <string name="fg_owner_approve">Разрешить доступ</string>
+  <string name="fg_owner_revoke">Отозвать доступ</string>
+  <string name="fg_owner_approve_confirmation">Сравните отпечаток %1$s с отпечатком на новом телефоне. Разрешить этому устройству подключение?</string>
+  <string name="fg_owner_revoke_confirmation">Отключить устройство %1$s от семейного сервера? Текущие подключения будут закрыты.</string>
+  <string name="fg_owner_denied">Управление доступно только с телефона владельца. Проверьте подключение или привязку телефона на сервере.</string>
+  <string name="fg_owner_already_changed">Заявка уже изменилась. Обновите список устройств.</string>
+  <string name="fg_owner_busy">Сервер завершает другую операцию. Повторите через несколько секунд.</string>
+  <string name="fg_owner_network_error">Не удалось обновить данные. Проверьте подключение и повторите.</string>
+</resources>

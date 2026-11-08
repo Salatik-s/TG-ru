@@ -1,0 +1,57 @@
+{
+  "client": {
+    "commit": "c83765c4151d50ba514325ddf0a3262769729dc6",
+    "original_build_ids": {
+      "arm64-v8a": "28acf3ed246ca3f26c40c0993afa3e1d82f906d9",
+      "x86_64": "7048b8cfb006807284f88cf7aa280bd2e087b502"
+    },
+    "repository": "https://github.com/exteraless/exteraless",
+    "snapshots": [
+      {
+        "file": "reference/physical_socket_server.cc",
+        "sha256": "fb5f4344f659dd21fcf0f6cbc61cf5475d2d84b9d4741cad5bf247293c7be595",
+        "upstream_path": "TMessagesProj/jni/voip/webrtc/rtc_base/physical_socket_server.cc",
+        "git_blob": "c3bc1814a103c2103e53d4824928187b080ddce4"
+      },
+      {
+        "file": "reference/physical_socket_server.h",
+        "sha256": "100d49b7ae39f0245b571df660cb365a40dc1bd2e9f05b7ee4c92dcbbda1adb3",
+        "upstream_path": "TMessagesProj/jni/voip/webrtc/rtc_base/physical_socket_server.h",
+        "git_blob": "2af563a3ca062c8ad866b78d0923ef8cd98634c1"
+      },
+      {
+        "file": "reference/android_network_monitor.cc",
+        "sha256": "bd555ee6f40d2cc531dbb29b8b26048da579cabbe143eb255eae72bc909799e6",
+        "upstream_path": "TMessagesProj/jni/voip/webrtc/sdk/android/src/jni/android_network_monitor.cc",
+        "git_blob": "a656a3440af9da2b3483123e41823c6d364b7fb2"
+      },
+      {
+        "file": "reference/NetworkSocketPosix.cpp",
+        "sha256": "9fd5f6549123321d1f2b52280a8f33cb9965fa14bde40b681a1926df3e9873ea",
+        "upstream_path": "TMessagesProj/jni/voip/libtgvoip/os/posix/NetworkSocketPosix.cpp",
+        "git_blob": "2006d34f81cbc8c32842b0dfe8dbb00905dbaa55"
+      },
+      {
+        "file": "reference/VoIPService.java",
+        "sha256": "3c414fa0d83138c5b02808b52458718c9aed50e125047b65ce67f5402597b274",
+        "upstream_path": "TMessagesProj/src/main/java/org/telegram/messenger/voip/VoIPService.java",
+        "git_blob": "8064106e3444dff4cd9d568b05c8e5025a0c13c9"
+      }
+    ]
+  },
+  "xhook": {
+    "commit": "391d0c4103626bf39d54a1d9c7a10965c82ff8d2",
+    "repository": "https://github.com/iqiyi/xHook",
+    "local_patch": "libxhook/jni/xh_util.c uses sysconf(_SC_PAGESIZE) instead of compile-time PAGE_SIZE/PAGE_MASK",
+    "patched_file_sha256": "ce20e9c25a1963cab0dc3b05d2b1f25a6f496fd196eda69d1a881f17471e603d"
+  },
+  "build": {
+    "abi": [
+      "arm64-v8a",
+      "x86_64"
+    ],
+    "max_page_size": 16384,
+    "android_api": 24,
+    "ndk": "r27c"
+  }
+}

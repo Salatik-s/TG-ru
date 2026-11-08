@@ -1,0 +1,9 @@
+{
+  "repository": "https://github.com/exteraless/exteraless",
+  "commit": "c83765c4151d50ba514325ddf0a3262769729dc6",
+  "tag": "v13.1.1-beta15",
+  "asset": "https://github.com/exteraless/exteraless/releases/download/v13.1.1-beta15/exteraless-13.1.1-beta15.apk",
+  "sha256": "3855d366b9fa7b49e9219ac26a698c4307e0d4c205dae9b7188ef351d0a3a2c5",
+  "bytes": 108097184,
+  "source": "GitHub official release metadata retrieved during this task; native source blob hashes are independently checked in native/upstream-lock.json"
+}

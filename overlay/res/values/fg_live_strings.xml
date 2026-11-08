@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="fg_live_join_description">Введите приглашение и назовите устройство, чтобы его узнали в семье.</string>
+    <string name="fg_invitation_code">Код приглашения</string>
+    <string name="fg_live_connected">Семейное подключение включено</string>
+    <string name="fg_live_connect_description">Открываем Telegram. Если подключение не удастся, можно повторить попытку.</string>
+    <string name="fg_live_service_scope">Семейный сервис одобряет устройства и выдаёт настройки подключения.</string>
+    <string name="fg_live_boundary">Семейный доступ и вход в Telegram — отдельные действия. Семейное подключение не означает, что обычные чаты получили сквозное шифрование.</string>
+    <string name="fg_change_server">Изменить адрес сервиса</string>
+    <string name="fg_apply_server">Применить адрес</string>
+    <string name="fg_setup_invalid">Введите имя устройства: от 1 до 80 символов.</string>
+    <string name="fg_live_working">Подождите…</string>
+    <string name="fg_connect_action">Подключиться</string>
+    <string name="fg_reconnect_action">Обновить подключение</string>
+    <string name="fg_retry_countdown">Повторная попытка через %1$d:%2$02d</string>
+    <string name="fg_invite_format_help">Введите код приглашения целиком. Допустимы латинские буквы, цифры и дефис.</string>
+    <string name="fg_already_enrolled">Заявка для этого устройства уже существует. Нажмите «Проверить статус».</string>
+    <string name="fg_native_missing">Не удалось запустить подключение. Обратитесь к тому, кто устанавливал приложение.</string>
+    <string name="fg_tunnel_failed">Не удалось подключиться. Попробуйте ещё раз.</string>
+    <string name="fg_invalid_service_response">Сервис не подтвердил подключение. Повторите попытку позже.</string>
+    <string name="fg_connection_lost">Подключение остановлено. Подключитесь заново.</string>
+    <string name="fg_not_approved">Устройство пока не получило доступ. Проверьте статус заявки.</string>
+    <string name="fg_request_expired">Не удалось завершить проверку устройства вовремя. Повторите действие.</string>
+    <string name="fg_network_error">Нет связи с семейным сервисом. Проверьте интернет и повторите попытку.</string>
+    <string name="fg_live_settings_intro">Доступ этого устройства, семейный туннель и дополнительные функции клиента.</string>
+    <string name="fg_live_no_tunnel">Подключитесь, чтобы открыть чаты и дополнительные настройки.</string>
+    <string name="fg_live_tunnel_active">Туннель работает. Статус связи с Telegram — в списке чатов.</string>
+    <string name="fg_live_ghost_info">Параметры ghost-режима находятся в дополнительных настройках клиента. Их действие зависит от выбранной функции; полной невидимости они не гарантируют.</string>
+    <string name="fg_live_history_info">Настройки сохранения удалённых сообщений находятся в дополнительных настройках клиента. Локальные копии и сообщения в Telegram — разные данные. Ранее не полученные сообщения восстановить нельзя.</string>
+    <string name="fg_live_plugins_info">Плагины управляются в разделе плагинов клиента. Перед включением проверьте источник и запрашиваемый доступ. Установка плагина сама по себе не подтверждает его безопасность.</string>
+    <string name="fg_live_security_info">Ключ этого устройства хранится в Android Keystore. Код приглашения и параметры туннеля не сохраняются в настройках FamilyGram. Отзыв семейного доступа не удаляет локальные копии сообщений и не завершает Telegram-сессию.</string>
+    <string name="fg_back">Назад</string>
+    <string name="fg_device_fingerprint">Идентификатор устройства</string>
+    <string name="fg_fingerprint_pending">Появится после проверки устройства.</string>
+    <string name="fg_copy_fingerprint">Скопировать идентификатор</string>
+    <string name="fg_fingerprint_copied">Идентификатор скопирован</string>
+    <string name="fg_feature_intro">Откройте нужный раздел настроек клиента.</string>
+    <string name="fg_extra_features">Дополнительные функции</string>
+    <string name="fg_ghost_destination">Ghost-режим</string>
+    <string name="fg_ghost_summary">Статусы чтения, набора и другие параметры</string>
+    <string name="fg_history_summary">Сохранение удалённых сообщений и изменений</string>
+    <string name="fg_plugins_summary">Расширения и их разрешения</string>
+    <string name="fg_connection_details">Сведения о подключении</string>
+    <string name="fg_hide_details">Скрыть сведения</string>
+</resources>

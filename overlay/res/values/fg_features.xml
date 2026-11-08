@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="fg_app_name">TG-ru</string>
+    <string name="fg_feature_unavailable">Не удалось открыть настройки. Обновите приложение.</string>
+</resources>
