@@ -1,0 +1,79 @@
+name: Native iOS unsigned baseline
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Compile-only baseline or own API credentials
+        type: choice
+        options: [unit-only, compile-only, own-api]
+        default: unit-only
+permissions:
+  contents: read
+concurrency:
+  group: ios-unsigned-${{ github.ref }}
+  cancel-in-progress: false
+defaults:
+  run:
+    working-directory: ios
+jobs:
+  unit:
+    if: github.ref == 'refs/heads/sukhovskiy.a.a/ios'
+    runs-on: xcode-27
+    timeout-minutes: 15
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - run: python3 build-support/test_build.py
+      - run: swift test --package-path family-core
+      - run: swift test --package-path transport
+  build:
+    needs: unit
+    if: ${{ inputs.mode != 'unit-only' }}
+    runs-on: xcode-27
+    timeout-minutes: 120
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Validate infrastructure
+        run: python3 build-support/test_build.py
+      - name: Check exact toolchain and own credentials before upstream download
+        env:
+          TG_API_ID: ${{ secrets.TG_API_ID }}
+          TG_API_HASH: ${{ secrets.TG_API_HASH }}
+        run: |
+          args=()
+          if [ "${{ inputs.mode }}" = "compile-only" ]; then args+=(--compile-only); fi
+          python3 build-support/build.py --preflight "${args[@]}"
+      - name: Fetch pinned native application and its submodules
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: TelegramMessenger/Telegram-iOS
+          ref: 24638bc69bd083981b178dd1e7f921eebbf7fc46
+          path: ios/upstream
+          fetch-depth: 1
+          submodules: recursive
+          persist-credentials: false
+      - name: Build complete arm64 application
+        env:
+          TG_API_ID: ${{ secrets.TG_API_ID }}
+          TG_API_HASH: ${{ secrets.TG_API_HASH }}
+        run: |
+          args=()
+          if [ "${{ inputs.mode }}" = "compile-only" ]; then args+=(--compile-only); fi
+          python3 build-support/build.py --build-number "${GITHUB_RUN_NUMBER}" "${args[@]}"
+      - name: Upload validated unsigned archive
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ${{ inputs.mode }}-unsigned-${{ github.run_number }}
+          path: |
+            ios/dist/*.ipa
+            ios/dist/build-manifest.json
+            ios/dist/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 7
