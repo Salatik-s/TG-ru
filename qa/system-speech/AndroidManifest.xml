@@ -1,0 +1,7 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.salatik.familygram.speechdiag">
+    <uses-sdk android:minSdkVersion="33" android:targetSdkVersion="35" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <queries><intent><action android:name="android.speech.RecognitionService" /></intent></queries>
+    <application android:label="FamilyGram speech diagnostic" android:testOnly="true" android:debuggable="true" android:allowBackup="false" />
+    <instrumentation android:name="com.salatik.familygram.speechdiag.SystemSpeechDiagnostic" android:targetPackage="com.salatik.familygram.speechdiag" android:functionalTest="true" />
+</manifest>

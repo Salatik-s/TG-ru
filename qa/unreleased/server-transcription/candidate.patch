@@ -1,0 +1,366 @@
+--- a/server/access.mjs
++++ b/server/access.mjs
+@@ -1,5 +1,6 @@
+ import { DatabaseSync } from 'node:sqlite';
+ import { createHash, createPublicKey, randomBytes, randomUUID, verify } from 'node:crypto';
++import {TRANSCRIPTION_ACTIONS,transcriptionPayload} from './transcription-policy.mjs';
+ 
+ export class ApiError extends Error {
+   constructor(status, code, retryAfter) { super(code); this.status = status; this.code = code; this.retryAfter = retryAfter; }
+@@ -45,7 +46,7 @@
+   }
+   challenge(input, ip) {
+     this.rate(ip, 'challenge', 3600, 3600);
+-    if (!input || !['invite','status','config','manage'].includes(input.action) || typeof input.public_key !== 'string' || input.public_key.length > 200) fail(400, 'invalid_request');
++    if (!input || !['invite','status','config','manage',...TRANSCRIPTION_ACTIONS].includes(input.action) || typeof input.public_key !== 'string' || input.public_key.length > 200) fail(400, 'invalid_request');
+     let key, der;
+     try {
+       key = createPublicKey({key: Buffer.from(input.public_key, 'base64'), format: 'der', type: 'spki'});
+@@ -65,6 +66,9 @@
+     if (input.action === 'invite') {
+       if (typeof payload.code !== 'string' || payload.code.length > 64 || typeof payload.name !== 'string' || payload.name.trim().length < 1 || payload.name.length > 80) fail(400, 'invalid_payload');
+       clean = {code_hash: hash(`${this.pepper}:${payload.code.trim().toUpperCase()}`), name: payload.name.trim()};
++    } else if(TRANSCRIPTION_ACTIONS.includes(input.action)) {
++      if(d.status!=='approved')fail(403,'not_approved');
++      try{clean=transcriptionPayload(input.action,payload);}catch{fail(400,'invalid_transcription_payload');}
+     } else if(input.action==='manage') {
+       if(!this.isPhoneOwner(d))fail(403,'owner_required');
+       if(!payload||typeof payload!=='object'||Array.isArray(payload)||!['list','invite','approve','revoke'].includes(payload.command))fail(400,'invalid_management');
+@@ -105,6 +109,10 @@
+     try { valid = verify('sha256',Buffer.from(c.message),createPublicKey({key:Buffer.from(d.public_key,'base64'),format:'der',type:'spki'}),Buffer.from(input.signature,'base64')); } catch {}
+     if (!valid) fail(401, 'invalid_proof');
+     this.allowed(d, c.action);
++    if(TRANSCRIPTION_ACTIONS.includes(c.action)) {
++      const current=this.device(d.id);if(current.status!=='approved')fail(403,'not_approved');
++      return {action:c.action,device:current,result:this.status(current),transcriptionRequest:JSON.parse(c.payload)};
++    }
+     if(c.action==='manage') {
+       if(!this.isPhoneOwner(this.device(d.id)))fail(403,'owner_required');
+       return {action:'manage',device:this.device(d.id),management:JSON.parse(c.payload)};
+--- a/server/http.mjs
++++ b/server/http.mjs
+@@ -11,7 +11,7 @@
+   res.end(JSON.stringify(value));
+ }
+ export function failure(res,e) { if(res.headersSent){res.destroy();return;}send(res,e instanceof ApiError?e.status:503,{error:e instanceof ApiError?e.code:'unavailable',...(e.retryAfter?{retry_after:e.retryAfter}:{})},e.retryAfter); }
+-export function apiServer(access,gateway,{trustProxy=false,push=null,manage=null}={}) {
++export function apiServer(access,gateway,{trustProxy=false,push=null,manage=null,transcription=null}={}) {
+   const server=createServer(async(req,res)=>{
+     try {
+       if(req.method==='GET' && req.url==='/health') return send(res,gateway.ready?200:503,{status:gateway.ready?'ok':'unavailable'});
+@@ -28,6 +28,12 @@
+       const input=await body(req);
+       if(req.url==='/v1/challenge') return send(res,200,access.challenge(input,ip));
+       const response=access.complete(input,ip);
++      if(response.transcriptionRequest){
++        if(!transcription)throw new ApiError(503,'transcription_unavailable');
++        const p=response.transcriptionRequest,id=response.device.id;
++        response.result.transcription=response.action==='transcription'?transcription.reserve(id,p):response.action==='transcription_cancel'?transcription.cancel(id,p.job_id):transcription.status(id,p.job_id);
++        return send(res,200,response.result);
++      }
+       if(response.action==='manage') {
+         if(typeof manage!=='function')throw new ApiError(503,'management_unavailable');
+         const management=await manage(response.device.id,response.management);
+@@ -45,3 +51,15 @@
+   server.requestTimeout=10000; server.headersTimeout=10000; server.maxHeadersCount=32;
+   return server;
+ }
++// Separate internal listener preserves the enrollment API's ten-second timeout.
++export function transcriptionServer(transcription){
++  const server=createServer(async(req,res)=>{
++    try{
++      const match=/^\/v1\/transcriptions\/([a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12})$/.exec(req.url||'');
++      if(req.method!=='PUT'||!match)throw new ApiError(404,'not_found');
++      const result=await transcription.upload(req,match[1]);send(res,202,{transcription:result});
++    }catch(e){failure(res,e);}
++  });
++  server.requestTimeout=90000;server.headersTimeout=10000;server.maxHeadersCount=20;
++  return server;
++}
+--- a/server/main.mjs
++++ b/server/main.mjs
+@@ -3,9 +3,11 @@
+ import { createServer } from 'node:http';
+ import { Access, ApiError } from './access.mjs';
+ import { Gateway } from './gateway.mjs';
+-import { apiServer, body, send, failure } from './http.mjs';
++import { apiServer, transcriptionServer, body, send, failure } from './http.mjs';
+ import { PushRelay } from './push.mjs';
+ import { EgressManager, loadSnapshot } from './egress.mjs';
++import {Transcription} from './transcription.mjs';
++import {createWhisperRunner} from './transcription-runner.mjs';
+ 
+ process.umask(0o077);
+ const dir=process.env.DATA_DIR || '/data'; mkdirSync(dir,{recursive:true,mode:0o700});
+@@ -17,6 +19,14 @@
+ const config=JSON.parse(readFileSync(configPath,'utf8'));
+ const access=new Access(`${dir}/access.sqlite`,{pepper:config.pepper});
+ const push=new PushRelay(access);
++let transcription=null,uploads=null;
++if(process.env.TRANSCRIPTION_ENABLED==='1'){
++  try{
++    const runner=createWhisperRunner({whisper:process.env.WHISPER_BINARY,ffmpeg:process.env.FFMPEG_BINARY,ffprobe:process.env.FFPROBE_BINARY,model:process.env.WHISPER_MODEL});
++    transcription=new Transcription(access,{directory:process.env.TRANSCRIPTION_TMP||`${dir}/transcription-tmp`,runner});
++    uploads=transcriptionServer(transcription);uploads.listen(8081,'0.0.0.0');
++  }catch{console.error('Local transcription unavailable; gateway and enrollment remain enabled');}
++}
+ const gateway=new Gateway(config,dir,process.env.XRAY_BINARY);
+ // Required private snapshot: missing or invalid inputs never enable a direct fallback.
+ const egress=new EgressManager(loadSnapshot(`${dir}/egress.json`),{
+@@ -36,12 +46,12 @@
+       if(['approve','revoke'].includes(command)&&actor===id)throw new ApiError(409,'cannot_modify_owner_phone');
+     }
+     const result=access.owner(command,id,hours);
+-    if(command==='revoke')push.revoke(id);
++    if(command==='revoke'){push.revoke(id);transcription?.revoke(id);}
+     if(['approve','revoke'].includes(command))await gateway.reload(()=>access.approved(),()=>egress.selected());
+     return result;
+   } finally {modifying=false;}
+ }
+-const api=apiServer(access,gateway,{trustProxy:process.env.TRUST_PROXY==='1',push,
++const api=apiServer(access,gateway,{trustProxy:process.env.TRUST_PROXY==='1',push,transcription,
+   manage:async(actor,p)=>{
+     const result=await management(p.command,p.device_id,p.hours,actor);
+     if(p.command!=='list')return result;
+@@ -69,7 +79,7 @@
+   finally {modifying=false;}
+ },30000).unref();
+ let stopping=false;
+-async function stop() {if(stopping)return;stopping=true;push.close();api.close();admin.close();await egress.close();await gateway.stop();access.close();process.exit(0);}
++async function stop() {if(stopping)return;stopping=true;push.close();api.close();uploads?.close();admin.close();await transcription?.close();await egress.close();await gateway.stop();access.close();process.exit(0);}
+ process.on('SIGTERM',stop); process.on('SIGINT',stop);
+ console.log('FamilyGram access service ready');
+ void egress.start();
+--- /dev/null
++++ b/server/transcription-policy.mjs
+@@ -0,0 +1,14 @@
++export const MAX_UPLOAD=16*1024*1024;
++export const MAX_SECONDS=300;
++export const TRANSCRIPTION_ACTIONS=['transcription','transcription_status','transcription_cancel'];
++export const MEDIA_TYPES=['audio/ogg','audio/opus','audio/mpeg','audio/mp4','audio/wav','audio/x-wav','audio/flac','audio/webm','video/mp4','video/webm'];
++export function transcriptionPayload(action,payload){
++  if(!payload||typeof payload!=='object'||Array.isArray(payload))throw Error();
++  const keys=Object.keys(payload).sort().join(',');
++  if(action==='transcription'){
++    if(keys!=='mime,sha256,size'||! /^[a-f0-9]{64}$/.test(payload.sha256||'')||!Number.isSafeInteger(payload.size)||payload.size<1||payload.size>MAX_UPLOAD||!MEDIA_TYPES.includes(payload.mime))throw Error();
++    return {sha256:payload.sha256,size:payload.size,mime:payload.mime};
++  }
++  if(!TRANSCRIPTION_ACTIONS.includes(action)||keys!=='job_id'||typeof payload.job_id!=='string'||! /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(payload.job_id))throw Error();
++  return {job_id:payload.job_id};
++}
+--- /dev/null
++++ b/server/transcription.mjs
+@@ -0,0 +1,85 @@
++import {createHash,randomBytes,randomUUID,timingSafeEqual} from 'node:crypto';
++import {mkdirSync,mkdtempSync,chmodSync,rmSync,lstatSync} from 'node:fs';
++import {open} from 'node:fs/promises';
++import {join} from 'node:path';
++import {ApiError} from './access.mjs';
++import {transcriptionPayload,MAX_UPLOAD,MAX_SECONDS} from './transcription-policy.mjs';
++
++const digest=value=>createHash('sha256').update(value).digest();
++const terminal=new Set(['done','failed','cancelled']);
++const publicErrors=new Set(['media_invalid','media_too_long','decode_failed','worker_failed','worker_timeout','output_too_large','upload_invalid','upload_timeout','content_mismatch','revoked','cancelled','expired']);
++export class Transcription {
++  constructor(access,{directory,runner,now=()=>Math.floor(Date.now()/1000),uploadTimeoutMs=90000}={}){
++    if(typeof runner!=='function'||!directory)throw Error('Transcription runtime unavailable');
++    this.access=access;this.runner=runner;this.now=now;this.uploadTimeoutMs=uploadTimeoutMs;this.jobs=new Map();this.active=null;this.closed=false;
++    mkdirSync(directory,{recursive:true,mode:0o700});if(lstatSync(directory).isSymbolicLink())throw Error('Invalid transcription directory');chmodSync(directory,0o700);
++    // A per-process directory isolates cleanup from other services and prior runs.
++    this.directory=mkdtempSync(join(directory,'worker-'));chmodSync(this.directory,0o700);
++    this.timer=setInterval(()=>this.sweep(),1000);this.timer.unref();
++  }
++  approved(id){if(this.access.device(id)?.status!=='approved')throw new ApiError(403,'not_approved');}
++  reserve(id,payload){
++    this.approved(id);this.sweep();if(this.closed)throw new ApiError(503,'transcription_unavailable');
++    const clean=transcriptionPayload('transcription',payload);
++    if(this.active)throw new ApiError(429,'transcription_busy',10);
++    this.access.rate(id,'transcription',30,3600);
++    while(this.jobs.size>=20){const oldest=[...this.jobs.values()].find(j=>terminal.has(j.state));if(!oldest)throw new ApiError(429,'transcription_busy',10);this.jobs.delete(oldest.id);}
++    const token=randomBytes(32).toString('base64url'),job={id:randomUUID(),device:id,payload:clean,state:'uploading',expires:this.now()+120,tokenHash:digest(token),abort:new AbortController(),request:null,operation:null,text:null,error:null};
++    job.directory=mkdtempSync(join(this.directory,'job-'));chmodSync(job.directory,0o700);this.jobs.set(job.id,job);this.active=job.id;
++    return {job_id:job.id,state:job.state,upload_url:`/v1/transcriptions/${job.id}`,upload_token:token,expires_at:job.expires,max_duration_seconds:MAX_SECONDS};
++  }
++  owned(id,jobId){this.approved(id);const job=this.jobs.get(jobId);if(!job||job.device!==id||job.expires<=this.now())throw new ApiError(404,'transcription_not_found');return job;}
++  status(id,jobId){this.sweep();return this.result(this.owned(id,jobId));}
++  result(job){return {job_id:job.id,state:job.state,expires_at:job.expires,...(job.state==='done'?{text:job.text}:{}),...(job.error?{error:job.error}:{})};}
++  cancel(id,jobId){const job=this.owned(id,jobId);this.abort(job,'cancelled');return this.result(job);}
++  abort(job,reason){
++    job.tokenHash=null;job.text=null;job.state=reason==='cancelled'?'cancelled':'failed';job.error=reason;job.expires=this.now()+600;job.abort.abort();job.request?.destroy();
++    if(!job.operation)this.cleanup(job);
++  }
++  cleanup(job){rmSync(job.directory,{recursive:true,force:true});if(this.active===job.id)this.active=null;}
++  revoke(id){for(const job of this.jobs.values())if(job.device===id){this.abort(job,'revoked');this.jobs.delete(job.id);}}
++  sweep(){
++    for(const job of this.jobs.values()){
++      if(this.access.device(job.device)?.status!=='approved'){this.revoke(job.device);continue;}
++      if(job.expires<=this.now()){if(!terminal.has(job.state))this.abort(job,'expired');this.jobs.delete(job.id);}
++    }
++  }
++  async upload(req,jobId){
++    const job=this.jobs.get(jobId),token=String(req.headers.authorization||'').replace(/^Bearer /,'');
++    if(!job||!job.tokenHash||job.state!=='uploading'||job.expires<=this.now()||! /^[A-Za-z0-9_-]{43}$/.test(token)||!timingSafeEqual(job.tokenHash,digest(token)))throw new ApiError(401,'invalid_upload_token');
++    this.approved(job.device);job.tokenHash=null;job.request=req;
++    let release;job.operation=new Promise(r=>release=r);
++    const timer=setTimeout(()=>{job.error='upload_timeout';job.abort.abort();req.destroy();},this.uploadTimeoutMs);timer.unref();
++    let file,bytes=0;const hash=createHash('sha256'),path=join(job.directory,'upload.bin');
++    try{
++      if(req.headers['content-type']!==job.payload.mime||String(req.headers['content-length'])!==String(job.payload.size)||req.headers['content-encoding']&&req.headers['content-encoding']!=='identity')throw new ApiError(400,'upload_invalid');
++      file=await open(path,'wx',0o600);
++      for await(const chunk of req){
++        if(job.abort.signal.aborted)throw new ApiError(410,job.error||'cancelled');
++        bytes+=chunk.length;if(bytes>job.payload.size||bytes>MAX_UPLOAD)throw new ApiError(413,'upload_invalid');
++        hash.update(chunk);await file.writeFile(chunk);
++      }
++      await file.close();file=null;this.approved(job.device);
++      if(job.abort.signal.aborted)throw new ApiError(410,job.error||'cancelled');
++      if(bytes!==job.payload.size||hash.digest('hex')!==job.payload.sha256)throw new ApiError(400,'content_mismatch');
++      job.state='processing';job.expires=this.now()+660;
++      clearTimeout(timer);job.request=null;release();job.operation=this.process(job,path);
++      return {job_id:job.id,state:'processing'};
++    }catch(error){
++      if(file)await file.close().catch(()=>{});
++      job.state='failed';job.error=publicErrors.has(error.code)?error.code:job.error||'upload_invalid';job.expires=this.now()+600;job.text=null;this.cleanup(job);release();job.operation=null;
++      throw new ApiError(error instanceof ApiError?error.status:400,job.error);
++    }finally{clearTimeout(timer);job.request=null;}
++  }
++  async process(job,path){
++    try{
++      const text=await this.runner({path,directory:job.directory,mime:job.payload.mime,maxSeconds:MAX_SECONDS,signal:job.abort.signal});
++      this.approved(job.device);
++      if(job.abort.signal.aborted)return;
++      if(typeof text!=='string'||Buffer.byteLength(text)>65536)throw Object.assign(Error(),{code:'output_too_large'});
++      job.text=text.trim();job.state='done';job.error=null;
++    }catch(error){if(!job.abort.signal.aborted){job.state='failed';job.error=publicErrors.has(error.code)?error.code:'worker_failed';job.text=null;}}
++    finally{job.expires=this.now()+600;this.cleanup(job);job.operation=null;}
++  }
++  async close(){this.closed=true;clearInterval(this.timer);const pending=[];for(const job of this.jobs.values()){this.abort(job,'cancelled');if(job.operation)pending.push(job.operation);}await Promise.allSettled(pending);this.jobs.clear();rmSync(this.directory,{recursive:true,force:true});}
++}
+--- /dev/null
++++ b/server/transcription-runner.mjs
+@@ -0,0 +1,39 @@
++import {spawn} from 'node:child_process';
++import {statSync,readFileSync} from 'node:fs';
++import {createHash} from 'node:crypto';
++import {join} from 'node:path';
++
++export const MODEL_SHA256='422f1ae452ade6f30a004d7e5c6a43195e4433bc370bf23fac9cc591f01a8898';
++const fault=code=>Object.assign(new Error(code),{code});
++export function runBounded(binary,args,{signal,timeoutMs,maxOutput=8192,spawnProcess=spawn}={}){
++  return new Promise((resolve,reject)=>{
++    if(signal?.aborted)return reject(fault('cancelled'));
++    let child,bytes=0,chunks=[],reason=null,killTimer;
++    try{child=spawnProcess(binary,args,{stdio:['ignore','pipe','pipe'],windowsHide:true});}catch{return reject(fault('worker_failed'));}
++    const stop=code=>{if(reason)return;reason=code;child.kill('SIGTERM');killTimer=setTimeout(()=>child.kill('SIGKILL'),500);killTimer.unref();};
++    const abort=()=>stop('cancelled');signal?.addEventListener('abort',abort,{once:true});
++    const timer=setTimeout(()=>stop('worker_timeout'),timeoutMs);timer.unref();
++    child.stdout.on('data',c=>{bytes+=c.length;if(bytes>maxOutput)stop('output_too_large');else chunks.push(c);});
++    child.stderr.on('data',()=>{}); // Never forward media metadata or recognized speech to logs.
++    child.once('error',()=>{reason='worker_failed';});
++    child.once('close',code=>{clearTimeout(timer);clearTimeout(killTimer);signal?.removeEventListener('abort',abort);if(reason||code!==0)reject(fault(reason||'worker_failed'));else resolve(Buffer.concat(chunks).toString('utf8'));chunks=[];});
++  });
++}
++export function createWhisperRunner({whisper,ffmpeg,ffprobe,model,spawnProcess=spawn}){
++  if(![whisper,ffmpeg,ffprobe,model].every(p=>typeof p==='string'&&p&&statSync(p).isFile()))throw Error('Transcription runtime missing');
++  if(createHash('sha256').update(readFileSync(model)).digest('hex')!==MODEL_SHA256)throw Error('Transcription model verification failed');
++  return async({path,directory,maxSeconds,signal})=>{
++    const common=['-v','error','-protocol_whitelist','file,pipe','-format_whitelist','ogg,mp3,wav,mov,matroska,webm,flac,aac'];
++    let metadata;
++    try{metadata=JSON.parse(await runBounded(ffprobe,[...common,'-probesize','4000000','-analyzeduration','5000000','-show_entries','format=duration:stream=codec_type,duration','-of','json',path],{signal,timeoutMs:15000,spawnProcess}));}catch(error){if(error.code==='cancelled')throw error;throw fault('media_invalid');}
++    const duration=Number(metadata.format?.duration);
++    if(!metadata.streams?.some(s=>s.codec_type==='audio')||!Number.isFinite(duration)||duration<=0)throw fault('media_invalid');
++    if(duration>maxSeconds)throw fault('media_too_long');
++    const wav=join(directory,'audio.wav'),prefix=join(directory,'transcript');
++    try{await runBounded(ffmpeg,[...common,'-nostdin','-y','-threads','1','-i',path,'-map','0:a:0','-vn','-sn','-dn','-t',String(maxSeconds+1),'-ac','1','-ar','16000','-c:a','pcm_s16le','-fs',String((maxSeconds+1)*32000+4096),'-f','wav',wav],{signal,timeoutMs:30000,spawnProcess});}catch(error){if(error.code==='cancelled')throw error;throw fault('decode_failed');}
++    if(statSync(wav).size>maxSeconds*32000+128)throw fault('media_too_long');
++    await runBounded(whisper,['-m',model,'-f',wav,'-l','auto','-t','2','-p','1','-bs','1','-bo','1','-ng','-np','-nt','-otxt','-of',prefix],{signal,timeoutMs:600000,maxOutput:65536,spawnProcess});
++    const textPath=prefix+'.txt';if(statSync(textPath).size>65536)throw fault('output_too_large');
++    return readFileSync(textPath,'utf8');
++  };
++}
+--- /dev/null
++++ b/server/test/transcription.test.mjs
+@@ -0,0 +1,83 @@
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import {generateKeyPairSync,sign,createHash} from 'node:crypto';
++import {mkdtempSync,rmSync,readdirSync,readFileSync,existsSync} from 'node:fs';
++import {tmpdir} from 'node:os';
++import {join} from 'node:path';
++import {Readable,PassThrough} from 'node:stream';
++import {Access} from '../access.mjs';
++import {Transcription} from '../transcription.mjs';
++import {runBounded} from '../transcription-runner.mjs';
++import {apiServer,transcriptionServer} from '../http.mjs';
++
++const hash=b=>createHash('sha256').update(b).digest('hex');
++const payload=b=>({sha256:hash(b),size:b.length,mime:'audio/ogg'});
++function fixture(t,runner=async()=> 'Test transcript'){
++ const dir=mkdtempSync(join(tmpdir(),'family-transcription-'));let time=1000000;
++ const access=new Access(join(dir,'access.sqlite'),{pepper:'a'.repeat(64),now:()=>time});
++ const newDevice=()=>{const key=generateKeyPairSync('ec',{namedCurve:'prime256v1'});key.public_key=key.publicKey.export({format:'der',type:'spki'}).toString('base64');const invitation=access.owner('invite');const challenge=access.challenge({public_key:key.public_key,action:'invite',payload:{code:invitation.code,name:'Phone'}},'127.0.0.1');access.complete(proof(challenge,key),'127.0.0.1');access.owner('approve',challenge.device_id);return {key,id:challenge.device_id};};
++ const device=newDevice(),service=new Transcription(access,{directory:join(dir,'work'),runner,now:()=>time,uploadTimeoutMs:40});
++ t.after(async()=>{await service.close();access.close();rmSync(dir,{recursive:true,force:true});});
++ return {dir,access,service,...device,newDevice,advance:n=>time+=n,challenge:(action,p)=>access.challenge({public_key:device.key.public_key,action,payload:p},'127.0.0.1')};
++}
++const proof=(c,k)=>({challenge_id:c.challenge_id,signature:sign('sha256',Buffer.from(c.message),k.privateKey).toString('base64')});
++const request=(bytes,reservation,overrides={})=>{const r=Readable.from([bytes]);r.headers={authorization:`Bearer ${reservation.upload_token}`,'content-type':'audio/ogg','content-length':String(bytes.length),...overrides};return r;};
++test('transcription proof binds exact normalized sha256/size/mime; replay, malformed metadata and revoke fail closed',t=>{
++ const f=fixture(t),p=payload(Buffer.from('audio')),c=f.challenge('transcription',p);
++ assert.equal(c.message.split('\n').at(-1),hash(JSON.stringify(p)));
++ const done=f.access.complete({...proof(c,f.key),payload:payload(Buffer.from('changed'))},'127.0.0.1');assert.deepEqual(done.transcriptionRequest,p);
++ assert.throws(()=>f.access.complete(proof(c,f.key),'127.0.0.1'),e=>e.code==='expired_or_replayed');
++ for(const bad of [{...p,size:16777217},{...p,mime:'application/json'},{...p,sha256:'x'.repeat(64)},{...p,filename:'../../x'}])assert.throws(()=>f.challenge('transcription',bad),e=>e.code==='invalid_transcription_payload');
++ const late=f.challenge('transcription',p);f.access.owner('revoke',f.id);assert.throws(()=>f.access.complete(proof(late,f.key),'127.0.0.1'),e=>e.code==='expired_or_replayed');
++});
++test('upload is one-use and exact bytes are hashed before worker; results are device-private and files removed',async t=>{
++ let seen;const f=fixture(t,async job=>{seen=readFileSync(job.path);return 'Private recognized words';}),bytes=Buffer.from('audio');
++ const r=f.service.reserve(f.id,payload(bytes));await f.service.upload(request(bytes,r),r.job_id);await f.service.jobs.get(r.job_id).operation;
++ assert.deepEqual(seen,bytes);assert.equal(f.service.status(f.id,r.job_id).text,'Private recognized words');assert.equal(readdirSync(f.service.directory).length,0);
++ await assert.rejects(f.service.upload(request(bytes,r),r.job_id),e=>e.code==='invalid_upload_token');
++ assert.throws(()=>f.service.status(f.newDevice().id,r.job_id),e=>e.code==='transcription_not_found');
++ const db=JSON.stringify(f.access.db.prepare('SELECT * FROM challenges').all());assert(!db.includes('Private recognized words'));
++});
++test('hash or MIME mismatch consumes upload and never executes worker',async t=>{
++ let runs=0;const f=fixture(t,async()=>{runs++;return 'never';}),bytes=Buffer.from('audio');
++ for(const change of ['hash','mime']){
++  const r=f.service.reserve(f.id,payload(bytes));const req=request(change==='hash'?Buffer.from('wrong'):bytes,r,change==='mime'?{'content-type':'video/mp4'}:{});
++  await assert.rejects(f.service.upload(req,r.job_id),e=>['content_mismatch','upload_invalid'].includes(e.code));
++  await assert.rejects(f.service.upload(request(bytes,r),r.job_id),e=>e.code==='invalid_upload_token');
++ }
++ assert.equal(runs,0);assert.equal(readdirSync(f.service.directory).length,0);
++});
++test('one real worker slot is held until cancelled computation actually exits',async t=>{
++ let finish;const f=fixture(t,()=>new Promise(r=>finish=r)),bytes=Buffer.from('audio');const r=f.service.reserve(f.id,payload(bytes));
++ await f.service.upload(request(bytes,r),r.job_id);const running=f.service.jobs.get(r.job_id).operation;
++ assert.equal(f.service.cancel(f.id,r.job_id).state,'cancelled');assert.throws(()=>f.service.reserve(f.id,payload(bytes)),e=>e.code==='transcription_busy');
++ finish('must not escape');await running;assert.equal(f.service.status(f.id,r.job_id).text,undefined);assert.equal(f.service.active,null);assert.equal(readdirSync(f.service.directory).length,0);
++});
++test('revoke aborts active worker, deletes results and makes upload tokens unusable',async t=>{
++ let aborted=false;const f=fixture(t,({signal})=>new Promise((_,reject)=>signal.addEventListener('abort',()=>{aborted=true;reject(Error());},{once:true}))),bytes=Buffer.from('audio');
++ const r=f.service.reserve(f.id,payload(bytes));await f.service.upload(request(bytes,r),r.job_id);const running=f.service.jobs.get(r.job_id).operation;
++ f.access.owner('revoke',f.id);f.service.revoke(f.id);await running;assert(aborted);assert.equal(f.service.jobs.size,0);assert.equal(f.service.active,null);assert.equal(readdirSync(f.service.directory).length,0);
++ await assert.rejects(f.service.upload(request(bytes,r),r.job_id),e=>e.code==='invalid_upload_token');
++});
++test('expired reservations and completed results are removed; slow upload closes and clears files',async t=>{
++ const f=fixture(t),bytes=Buffer.from('audio');const old=f.service.reserve(f.id,payload(bytes));f.advance(121);f.service.sweep();assert.equal(f.service.active,null);assert.equal(f.service.jobs.size,0);
++ await assert.rejects(f.service.upload(request(bytes,old),old.job_id),e=>e.code==='invalid_upload_token');
++ const r=f.service.reserve(f.id,payload(bytes)),slow=new PassThrough();slow.headers=request(bytes,r).headers;
++ await assert.rejects(f.service.upload(slow,r.job_id),e=>e.code==='upload_timeout');assert.equal(f.service.active,null);assert.equal(readdirSync(f.service.directory).length,0);
++ const next=f.service.reserve(f.id,payload(bytes));await f.service.upload(request(bytes,next),next.job_id);await f.service.jobs.get(next.job_id).operation;
++ f.advance(601);f.service.sweep();assert.equal(f.service.jobs.size,0);
++});
++test('separate HTTP upload preserves API timeout and approved PoP envelope',async t=>{
++ const f=fixture(t),bytes=Buffer.from('audio'),api=apiServer(f.access,{ready:true},{transcription:f.service}),upload=transcriptionServer(f.service);
++ await Promise.all([new Promise(r=>api.listen(0,'127.0.0.1',r)),new Promise(r=>upload.listen(0,'127.0.0.1',r))]);t.after(()=>{api.close();upload.close();});assert.equal(api.requestTimeout,10000);assert.equal(upload.requestTimeout,90000);
++ const complete=async actionPayload=>{const c=f.challenge(actionPayload.action,actionPayload.payload);const response=await fetch(`http://127.0.0.1:${api.address().port}/v1/complete`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(proof(c,f.key))});assert.equal(response.status,200);return response.json();};
++ const reserved=await complete({action:'transcription',payload:payload(bytes)});assert.equal(reserved.status,'approved');assert(reserved.transcription.upload_token);
++ const res=await fetch(`http://127.0.0.1:${upload.address().port}${reserved.transcription.upload_url}`,{method:'PUT',headers:{Authorization:`Bearer ${reserved.transcription.upload_token}`,'Content-Type':'audio/ogg'},body:bytes});assert.equal(res.status,202);
++ await f.service.jobs.get(reserved.transcription.job_id).operation;
++ const status=await complete({action:'transcription_status',payload:{job_id:reserved.transcription.job_id}});assert.equal(status.transcription.state,'done');assert.equal(status.transcription.upload_token,undefined);
++});
++test('worker subprocess has real deadline and bounded output without forwarding stderr',async()=>{
++ await assert.rejects(runBounded(process.execPath,['-e','setInterval(()=>{},1000)'],{timeoutMs:30}),e=>e.code==='worker_timeout');
++ await assert.rejects(runBounded(process.execPath,['-e',"process.stdout.write('x'.repeat(10000))"],{timeoutMs:3000,maxOutput:128}),e=>e.code==='output_too_large');
++ const controller=new AbortController();controller.abort();await assert.rejects(runBounded(process.execPath,['-e',''],{signal:controller.signal,timeoutMs:100}),e=>e.code==='cancelled');
++});

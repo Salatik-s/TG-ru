@@ -40,16 +40,18 @@ public final class FamilyDocumentService extends Service {
     @Override public void onDestroy(){work.shutdownNow();super.onDestroy();}
     private static void send(Messenger reply,Bundle value,String error){try{Message response=Message.obtain(null,error==null?1:2);Bundle payload=value==null?new Bundle():value;if(error!=null)payload.putString("error",error);response.setData(payload);reply.send(response);}catch(RemoteException ignored){}}
     private static Bundle pdf(ParcelFileDescriptor fd,Bundle input)throws Exception{
-        int index=input.getInt("page",0),width=Math.max(256,Math.min(1200,input.getInt("width",1080)));
+        int index=input.getInt("page",0),width=Math.max(256,Math.min(4096,input.getInt("width",1080)));
         try(PdfRenderer renderer=new PdfRenderer(fd)){
             int count=renderer.getPageCount();if(index<0||index>=count||count>5000)throw new IOException();
             try(PdfRenderer.Page page=renderer.openPage(index)){
                 if(page.getWidth()<1||page.getHeight()<1||page.getWidth()>100000||page.getHeight()>100000)throw new IOException();
-                int height=Math.max(64,Math.min(2400,(int)Math.ceil((double)width*page.getHeight()/page.getWidth())));
+                double target=Math.min((double)width/page.getWidth(),4096.0/page.getHeight());
+                target=Math.min(target,Math.sqrt(8000000.0/((double)page.getWidth()*page.getHeight())));
+                width=Math.max(1,(int)Math.ceil(page.getWidth()*target));int height=Math.max(1,(int)Math.ceil(page.getHeight()*target));
                 Bitmap image=Bitmap.createBitmap(width,height,Bitmap.Config.ARGB_8888);image.eraseColor(Color.WHITE);
                 Matrix scale=new Matrix();float ratio=Math.min((float)width/page.getWidth(),(float)height/page.getHeight());scale.setScale(ratio,ratio);
                 page.render(image,null,scale,PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
-                Bundle result=new Bundle();result.putParcelable("bitmap",image);result.putInt("page_count",count);result.putInt("page",index);return result;
+                Bundle result=new Bundle();result.putParcelable("bitmap",image);result.putInt("page_count",count);result.putInt("page",index);result.putInt("page_width",page.getWidth());result.putInt("page_height",page.getHeight());result.putInt("requested_width",input.getInt("width",1080));return result;
             }
         }
     }
@@ -61,6 +63,8 @@ public final class FamilyDocumentService extends Service {
         String value;
         try(InputStream input=new ParcelFileDescriptor.AutoCloseInputStream(fd)){
             byte[] data=read(input,32*1024*1024);
+            try {String html=FamilyOfficeRenderer.render(data,extension);Bundle result=new Bundle();result.putString("html",html);return result;}
+            catch(UnsupportedOperationException fallback) { /* RTF keeps its bounded local text parser. */ }
             if(extension.equals("docx")||extension.equals("odt"))value=zippedXml(data,extension.equals("docx")?"word/document.xml":"content.xml",extension.equals("docx"));
             else if(extension.equals("doc"))value=legacyWord(data);
             else if(extension.equals("rtf"))value=rtf(data);

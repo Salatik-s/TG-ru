@@ -1,0 +1,9 @@
+{
+  "server/access.mjs": "961e335a7c63d2cd6460d8096f339129e6016720a89d0df1d0b981757f204c88",
+  "server/http.mjs": "95e357ec9d71fbf97552bd66da6be5bad9a0f5667fd58c87dc764a7fc7575fdc",
+  "server/main.mjs": "6a0ed20805cf5ac9cd8054d0c36c4d9e86c35a81d7bc006ceb1ad48ba3b5e6b4",
+  "server/transcription-policy.mjs": "d991eeeb065a1173d781b6ad18aa42603d6c2d28616c971638b9a74e7a32f916",
+  "server/transcription.mjs": "e6240fd842463954141bfd6d147541f4d3b85702295dbc5f06d7fb1b2ecf9a89",
+  "server/transcription-runner.mjs": "63920d5648baed4e2513a8a20e2cc5223cc43486f41fb62221dbee92d3410b59",
+  "server/test/transcription.test.mjs": "04ddd450ffcb996ddd9a6307171ce398706fc28b5d84f38cc81b2e4f8a5e7c67"
+}

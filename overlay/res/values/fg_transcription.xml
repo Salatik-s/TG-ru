@@ -1,0 +1,25 @@
+<resources>
+ <string name="fg_transcription_title">Расшифровка записи</string>
+ <string name="fg_transcription_menu">Расшифровать на телефоне</string>
+ <string name="fg_transcription_intro">Системное распознавание на этом телефоне. Запись не отправляется на сервер. Telegram Premium не нужен; текст не отправится в чат.</string>
+ <string name="fg_transcription_limit">До 5 минут и 16 МБ. Для выбранного языка должна быть установлена системная модель распознавания.</string>
+ <string name="fg_transcription_start">Расшифровать</string>
+ <string name="fg_transcription_stop">Отменить</string>
+ <string name="fg_transcription_ready">Запись готова к обработке</string>
+ <string name="fg_transcription_download">Загружаем выбранную запись из Telegram…</string>
+ <string name="fg_transcription_upload">Подготавливаем звук…</string>
+ <string name="fg_transcription_processing">Распознаём речь на телефоне…</string>
+ <string name="fg_transcription_done">Готово. Распознавание может содержать ошибки.</string>
+ <string name="fg_transcription_cancelled">Обработка отменена</string>
+ <string name="fg_transcription_copy">Скопировать расшифровку</string>
+ <string name="fg_transcription_unavailable">Локальное распознавание записей недоступно на этом устройстве.</string>
+ <string name="fg_transcription_failed">Не удалось расшифровать запись. Повторите попытку.</string>
+ <string name="fg_transcription_busy">Системное распознавание занято. Попробуйте немного позже.</string>
+ <string name="fg_transcription_too_large">Выберите запись до 5 минут и 16 МБ</string>
+ <string name="fg_transcription_no_speech">В записи не удалось распознать речь</string>
+ <string name="fg_transcription_language">Язык: %1$s</string>
+ <string name="fg_transcription_language_title">Язык записи</string>
+ <string name="fg_transcription_models">Загрузить язык распознавания</string>
+ <string name="fg_transcription_model_missing">Для этого языка ещё нет локальной модели. Её можно загрузить средствами Android.</string>
+ <string name="fg_transcription_model_loading">Android загружает модель языка…</string>
+</resources>

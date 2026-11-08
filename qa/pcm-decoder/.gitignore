@@ -1,0 +1,4 @@
+build/
+build-dex/
+codec-build/
+*.apk

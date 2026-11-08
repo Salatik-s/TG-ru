@@ -40,7 +40,7 @@ public final class SavedMediaDiagnostic extends Instrumentation {
     private long began;
     @Override public void onCreate(Bundle arguments) {
         super.onCreate(arguments);
-        String requested=arguments.getString("mode","all");if(requested.matches("photo|features|owner|tools|owner-cycle|finalize"))mode=requested;
+        String requested=arguments.getString("mode","all");if(requested.matches("photo|features|owner|tools|documents|owner-cycle|finalize|inline|speech|user-voice"))mode=requested;
         ((Application)getTargetContext().getApplicationContext()).registerActivityLifecycleCallbacks(new Application.ActivityLifecycleCallbacks() {
             public void onActivityResumed(Activity a) {current=a; if(a.getClass().getName().equals("org.telegram.ui.LaunchActivity")) launch=a; }
             public void onActivityCreated(Activity a,Bundle b) {}
@@ -107,9 +107,11 @@ public final class SavedMediaDiagnostic extends Instrumentation {
             status("SELF_ONLY_READY",0,0);
             if(mode.equals("features")){ghost();deleted();report.putString("result","GHOST_AND_SELF_DELETION_HISTORY_PASSED");}
             else if(mode.equals("owner")){owner();report.putString("result","BOUND_PHONE_OWNER_LIST_PASSED");}
-            else if(mode.equals("tools")){tools();report.putString("result","LOCAL_PYTHON_AND_DOCUMENT_VIEWERS_PASSED");}
+            else if(mode.equals("tools")||mode.equals("documents")){tools();report.putString("result",mode.equals("documents")?"LOCAL_DOCUMENT_VIEWERS_AND_ZOOM_PASSED":"CONTEXT_INLINE_PYTHON_EXPLICIT_EDITOR_AND_DOCUMENT_VIEWERS_PASSED");}
+            else if(mode.equals("inline")){inlinePython();report.putString("result","INLINE_PYTHON_REAL_SAVED_MESSAGE_LOCAL_RESULT_PASSED");}
+            else if(mode.equals("speech")||mode.equals("user-voice")){localSpeech(mode.equals("user-voice"));report.putString("result",mode.equals("user-voice")?"AUTHORIZED_PRIVATE_SAVED_VOICE_LOCAL_NATIVE_BUBBLE_PASSED":"SYSTEM_SPEECH_REAL_SAVED_AUDIO_NATIVE_BUBBLE_PASSED");}
             else if(mode.equals("owner-cycle")){ownerCycle();report.putString("result","OWNER_INVITE_APPROVE_REVOKE_AND_NONOWNER_DENIAL_PASSED");}
-            else if(mode.equals("finalize")){finalizeSettings();report.putString("result","SAA_OWNER_UI_AND_BOTH_TOOLS_DISABLED_VERIFIED");}
+            else if(mode.equals("finalize")){finalizeSettings();report.putString("result","SAA_OWNER_UI_AND_ORIGINAL_PLUGIN_CHOICES_PRESERVED_VERIFIED");}
             else{if(mode.equals("all")){document("small",128*1024);document("large",12*1024*1024+197);}photo();report.putString("result","SAVED_MESSAGES_MEDIA_ROUNDTRIP_PASSED");}
             report.putInt("tests_passed",mode.equals("all")?3:mode.equals("features")?2:1);
             report.putBoolean("recipient_was_self_only",true);
@@ -249,26 +251,49 @@ public final class SavedMediaDiagnostic extends Instrumentation {
         guard();Class<?> tools=cls("org.telegram.messenger.family.FamilyChatTools");Method enabled=tools.getMethod("enabled",android.content.Context.class,String.class),toggle=tools.getMethod("setEnabled",android.content.Context.class,String.class,boolean.class);
         boolean python=(Boolean)enabled.invoke(null,getTargetContext(),"python"),documents=(Boolean)enabled.invoke(null,getTargetContext(),"documents");
         status(python||documents?"TOOLS_EXISTING_USER_CHOICE_PRESERVED":"BOTH_BUNDLED_TOOLS_DISABLED_BY_DEFAULT",0,0);
+        ActivityMonitor contextEditorMonitor=addMonitor("org.telegram.messenger.family.FamilyPythonActivity",null,false);
         try{
             toggle.invoke(null,getTargetContext(),"python",true);toggle.invoke(null,getTargetContext(),"documents",true);
+            long until;
+            if(!mode.equals("documents")){
             String snippet="print('SAA_QA_CODE_42')";expectedCaption=snippet;acknowledgedMessage.set(null);acknowledgedId.set(0);
             Class<?> paramsType=cls("org.telegram.messenger.SendMessagesHelper$SendMessageParams");Object params=paramsType.getMethod("of",String.class,long.class).invoke(null,snippet,self);set(params,"notify",false);
             Object entity=cls("org.telegram.tgnet.TLRPC$TL_messageEntityPre").getConstructor().newInstance();set(entity,"offset",0);set(entity,"length",snippet.length());set(entity,"language","python");ArrayList<Object> entities=new ArrayList<>();entities.add(entity);set(params,"entities",entities);
             Object sender=instance.getClass().getMethod("getSendMessagesHelper").invoke(instance);ui(()->{guard();sender.getClass().getMethod("sendMessage",paramsType).invoke(sender,params);});
             long ackDeadline=SystemClock.elapsedRealtime()+30000;while(acknowledgedMessage.get()==null&&SystemClock.elapsedRealtime()<ackDeadline)SystemClock.sleep(100);if(acknowledgedMessage.get()==null)throw new Check("PYTHON_SELF_CODE_MESSAGE_ACK_TIMEOUT");
-            Object message=cls("org.telegram.messenger.MessageObject").getConstructor(int.class,cls("org.telegram.tgnet.TLRPC$Message"),boolean.class,boolean.class).newInstance(account,acknowledgedMessage.get(),false,false);
+            final int target=acknowledgedId.get();
+            ui(()->{guard();selfChat.getClass().getMethod("scrollToMessageId",int.class,int.class,boolean.class,int.class,boolean.class,int.class).invoke(selfChat,target,0,false,0,true,0);});
+            AtomicReference<android.view.ViewGroup> contextPanel=new AtomicReference<>();long panelDeadline=SystemClock.elapsedRealtime()+15000;
+            while(contextPanel.get()==null&&SystemClock.elapsedRealtime()<panelDeadline){ui(()->contextPanel.set(inlinePanel((android.view.View)selfChat.getClass().getMethod("getFragmentView").invoke(selfChat),target)));if(contextPanel.get()==null)SystemClock.sleep(100);}
+            if(contextPanel.get()==null)throw new Check("CONTEXT_PYTHON_OWN_MESSAGE_PANEL_NOT_VISIBLE");
+            AtomicReference<Object> selectedMessage=new AtomicReference<>();
+            ui(()->{android.view.ViewGroup panel=contextPanel.get();if(!panel.isShown()||!panel.isAttachedToWindow())throw new Check("CONTEXT_PYTHON_PANEL_NOT_ATTACHED");Object cell=panel.getParent();Object actual=cell.getClass().getMethod("getMessageObject").invoke(cell);if(((Number)field(actual,"currentAccount")).intValue()!=account||((Number)actual.getClass().getMethod("getDialogId").invoke(actual)).longValue()!=self||((Number)actual.getClass().getMethod("getId").invoke(actual)).intValue()!=target)throw new Check("CONTEXT_PYTHON_CELL_IDENTITY_MISMATCH");selectedMessage.set(actual);});
+            Object message=selectedMessage.get();
+            if(current!=launch)throw new Check("CONTEXT_PYTHON_NOT_IN_CHAT_BEFORE_ACTION");
             ui(()->{Object previous=hidden(selfChat,"selectedObject");try{setHidden(selfChat,"selectedObject",message);ArrayList<Integer> icons=new ArrayList<>(),options=new ArrayList<>();ArrayList<CharSequence> labels=new ArrayList<>();selfChat.getClass().getMethod("fillMessageMenu",cls("org.telegram.messenger.MessageObject"),ArrayList.class,ArrayList.class,ArrayList.class).invoke(selfChat,message,icons,labels,options);int option=tools.getField("RUN_PYTHON").getInt(null);if(!options.contains(option))throw new Check("PYTHON_CONTEXT_MENU_ACTION_MISSING");selfChat.getClass().getMethod("processSelectedOption",int.class).invoke(selfChat,option);}finally{setHidden(selfChat,"selectedObject",previous);}});
-            status("REAL_SAVED_CODE_MESSAGE_CONTEXT_MENU_ACTION_PASSED",0,0);
-            Activity activity=waitActivity("FamilyPythonActivity");long until=SystemClock.elapsedRealtime()+20000;while(!(Boolean)hidden(activity,"ready")&&SystemClock.elapsedRealtime()<until)SystemClock.sleep(100);
+            AtomicBoolean inlineResult=new AtomicBoolean();long inlineDeadline=SystemClock.elapsedRealtime()+45000;
+            while(!inlineResult.get()&&SystemClock.elapsedRealtime()<inlineDeadline){
+                if(current!=launch||contextEditorMonitor.getHits()!=0)throw new Check("CONTEXT_PYTHON_OPENED_AN_EDITOR_OR_ANOTHER_ACTIVITY");
+                ui(()->{android.view.ViewGroup panel=inlinePanel((android.view.View)selfChat.getClass().getMethod("getFragmentView").invoke(selfChat),target);if(panel==null||!panel.isShown())return;for(int n=0;n<panel.getChildCount();n++){android.view.View child=panel.getChildAt(n);if(child instanceof android.widget.ScrollView){android.view.View output=((android.widget.ScrollView)child).getChildAt(0);if(output instanceof android.widget.TextView&&((android.widget.TextView)output).getText().toString().trim().equals("SAA_QA_CODE_42"))inlineResult.set(true);}}});
+                if(!inlineResult.get())SystemClock.sleep(100);
+            }
+            if(!inlineResult.get())throw new Check("CONTEXT_PYTHON_EXACT_INLINE_RESULT_NOT_VISIBLE");
+            if(current!=launch||contextEditorMonitor.getHits()!=0)throw new Check("CONTEXT_PYTHON_OPENED_AN_EDITOR_OR_ANOTHER_ACTIVITY");
+            status("REAL_SAVED_CONTEXT_ACTION_EXACT_INLINE_RESULT_WITHOUT_EDITOR_PASSED",0,0);
+            removeMonitor(contextEditorMonitor);
+            // Advanced sandbox tests intentionally open the separate editor explicitly.
+            ui(()->tools.getMethod("openPython",Activity.class,String.class).invoke(null,launch,snippet));
+            Activity activity=waitActivity("FamilyPythonActivity");until=SystemClock.elapsedRealtime()+20000;while(!(Boolean)hidden(activity,"ready")&&SystemClock.elapsedRealtime()<until)SystemClock.sleep(100);
             if(!(Boolean)hidden(activity,"ready"))throw new Check("PYTHON_WEBVIEW_NOT_READY");
             if(!((android.widget.EditText)hidden(activity,"code")).getText().toString().equals(snippet))throw new Check("PYTHON_CODE_BLOCK_EXTRACTION_MISMATCH");
             String result=runPython(activity,"print(sum(range(10)))\nprint(input()[::-1])","SAA");if(!result.trim().equals("45\nAAS"))throw new Check("PYTHON_CALCULATION_OR_STDIN_FAILED");status("PYTHON_LOCAL_COMPUTATION_STDIN_PASSED",0,0);screenshot(activity,"python-result.png");
             result=runPython(activity,"import js, os\nprint(hasattr(js, 'fetch'))\nprint(os.path.exists('/data/user/0/com.salatik.familygram/files'))","");if(!result.trim().equals("False\nFalse"))throw new Check("PYTHON_VIRTUAL_FILES_OR_JS_BOUNDARY_FAILED");status("PYTHON_NO_JS_FETCH_OR_APP_PRIVATE_FILES_PASSED",0,0);
-            ui(()->((android.webkit.WebView)hidden(activity,"web")).evaluateJavascript("fetch('https://24projects.ru:8443/health').then(()=>console.log('SAA_RUNNER:'+JSON.stringify({type:'result',text:'NETWORK_ALLOWED'}))).catch(()=>console.log('SAA_RUNNER:'+JSON.stringify({type:'result',text:'NETWORK_BLOCKED'})))",null));
-            until=SystemClock.elapsedRealtime()+5000;while(!((android.widget.TextView)hidden(activity,"output")).getText().toString().equals("NETWORK_BLOCKED")&&SystemClock.elapsedRealtime()<until)SystemClock.sleep(100);if(!((android.widget.TextView)hidden(activity,"output")).getText().toString().equals("NETWORK_BLOCKED"))throw new Check("PYTHON_BROWSER_NETWORK_BOUNDARY_FAILED");status("PYTHON_BROWSER_NETWORK_REQUEST_BLOCKED",0,0);
+            ui(()->((android.webkit.WebView)hidden(activity,"web")).evaluateJavascript("window.__saaQaNetwork='WAIT';fetch('https://24projects.ru:8443/health').then(()=>{window.__saaQaNetwork='NETWORK_ALLOWED'}).catch(()=>{window.__saaQaNetwork='NETWORK_BLOCKED'})",null));
+            AtomicReference<String> networkProbe=new AtomicReference<>("");until=SystemClock.elapsedRealtime()+5000;while(!networkProbe.get().contains("NETWORK_BLOCKED")&&SystemClock.elapsedRealtime()<until){ui(()->((android.webkit.WebView)hidden(activity,"web")).evaluateJavascript("window.__saaQaNetwork",networkProbe::set));SystemClock.sleep(100);}if(!networkProbe.get().contains("NETWORK_BLOCKED"))throw new Check("PYTHON_BROWSER_NETWORK_BOUNDARY_FAILED");status("PYTHON_BROWSER_NETWORK_REQUEST_BLOCKED",0,0);
             result=runPython(activity,"print(","");if(!result.contains("SyntaxError"))throw new Check("PYTHON_SYNTAX_ERROR_NOT_REPORTED");
             result=runPython(activity,"while True: pass","");if(!result.contains("лимит")&&!result.contains("превышен"))throw new Check("PYTHON_TIME_LIMIT_FAILED");status("PYTHON_SYNTAX_AND_INFINITE_LOOP_TIMEOUT_PASSED",0,0);
             ui(activity::finish);SystemClock.sleep(300);
+            }
             for(String extension:new String[]{"pdf","docx","doc","odt","rtf","txt"}){
                 File file=new File(folder,"fixture."+extension);try(InputStream in=getContext().getAssets().open(file.getName());OutputStream out=new FileOutputStream(file)){byte[] buffer=new byte[8192];int n;while((n=in.read(buffer))!=-1)out.write(buffer,0,n);}
                 ui(()->{boolean opened=(Boolean)cls("org.telegram.messenger.AndroidUtilities").getMethod("openForView",File.class,String.class,String.class,Activity.class,cls("org.telegram.ui.ActionBar.Theme$ResourcesProvider"),boolean.class).invoke(null,file,file.getName(),"application/octet-stream",launch,null,false);if(!opened)throw new Check("UPSTREAM_DOCUMENT_HOOK_FAILED");});
@@ -276,16 +301,126 @@ public final class SavedMediaDiagnostic extends Instrumentation {
                 if(extension.equals("pdf")){
                     while(((Integer)hidden(viewer,"count"))<1&&SystemClock.elapsedRealtime()<until)SystemClock.sleep(100);
                     if((Integer)hidden(viewer,"count")!=2||hidden(viewer,"shown")==null)throw new Check("PDF_ISOLATED_RENDER_FAILED");
-                    screenshot(viewer,"pdf-page1.png");ui(()->((android.widget.Button)hidden(viewer,"next")).performClick());SystemClock.sleep(200);until=SystemClock.elapsedRealtime()+10000;while((Boolean)hidden(viewer,"busy")&&SystemClock.elapsedRealtime()<until)SystemClock.sleep(100);if((Integer)hidden(viewer,"page")!=1)throw new Check("PDF_PAGINATION_FAILED");SystemClock.sleep(2000);
+                    screenshot(viewer,"pdf-page1.png");
+                    Object pdf=hidden(viewer,"image");int initialWidth=((Bitmap)hidden(viewer,"shown")).getWidth();
+                    ui(()->pinch((android.view.View)pdf));SystemClock.sleep(700);until=SystemClock.elapsedRealtime()+10000;while((Boolean)hidden(viewer,"busy")&&SystemClock.elapsedRealtime()<until)SystemClock.sleep(100);
+                    if(((Number)pdf.getClass().getMethod("getZoom").invoke(pdf)).floatValue()<1.5f||((Bitmap)hidden(viewer,"shown")).getWidth()<=initialWidth)throw new Check("PDF_PINCH_OR_HIGH_RESOLUTION_RERENDER_FAILED");
+                    screenshot(viewer,"pdf-zoomed.png");ui(()->pdf.getClass().getMethod("fitPage").invoke(pdf));
+                    status("PDF_REAL_PINCH_HIGH_RESOLUTION_AND_FIT_PASSED",0,0);
+                    ui(()->((android.widget.Button)hidden(viewer,"next")).performClick());SystemClock.sleep(200);until=SystemClock.elapsedRealtime()+10000;while((Boolean)hidden(viewer,"busy")&&SystemClock.elapsedRealtime()<until)SystemClock.sleep(100);if((Integer)hidden(viewer,"page")!=1)throw new Check("PDF_PAGINATION_FAILED");SystemClock.sleep(500);
                 }else{
                     String marker=extension.equals("doc")?"SAA_QA_DOC_BINARY":extension.equals("txt")?"SAA_QA_TEXT":"SAA_QA_"+extension.toUpperCase();String value="";
                     while(SystemClock.elapsedRealtime()<until){value=((android.widget.TextView)hidden(viewer,"text")).getText().toString();if(value.contains(marker))break;SystemClock.sleep(100);}
-                    if(!value.contains(marker))throw new Check("LOCAL_DOCUMENT_PARSE_FAILED_"+extension.toUpperCase());if(extension.equals("docx")&&!value.contains("& < >"))throw new Check("DOCX_XML_ENTITY_TEXT_FAILED");screenshot(viewer,"document-"+extension+".png");
+                    if(!value.contains(marker))throw new Check("LOCAL_DOCUMENT_PARSE_FAILED_"+extension.toUpperCase());if(extension.equals("docx")&&!value.contains("& < >"))throw new Check("DOCX_XML_ENTITY_TEXT_FAILED");
+                    while(!(Boolean)hidden(viewer,"htmlLoaded")&&SystemClock.elapsedRealtime()<until)SystemClock.sleep(100);if(!(Boolean)hidden(viewer,"htmlLoaded"))throw new Check("FORMATTED_DOCUMENT_WEBVIEW_NOT_LOADED");
+                    if(extension.equals("docx")){android.webkit.WebView web=(android.webkit.WebView)hidden(viewer,"document");AtomicReference<Float> baseScale=new AtomicReference<>();ui(()->{baseScale.set(web.getScale());web.zoomIn();});SystemClock.sleep(500);AtomicBoolean enlarged=new AtomicBoolean();ui(()->enlarged.set(web.getScale()>baseScale.get()*1.05f));if(!enlarged.get())throw new Check("WORD_NATIVE_ZOOM_NOT_WORKING");status("WORD_FORMATTED_LOCAL_WEBVIEW_AND_NATIVE_ZOOM_PASSED",0,0);}
+                    screenshot(viewer,"document-"+extension+".png");
                 }
                 status("INTERNAL_"+extension.toUpperCase()+"_VIEWER_PASSED",0,0);ui(viewer::finish);SystemClock.sleep(200);
             }
-        }finally{toggle.invoke(null,getTargetContext(),"python",python);toggle.invoke(null,getTargetContext(),"documents",documents);if(!getTargetContext().getSharedPreferences("saa_builtin_plugins_v1",0).edit().putBoolean("python",python).putBoolean("documents",documents).commit())throw new Check("QA_PREFERENCE_RESTORE_FAILED");status("TOOLS_ORIGINAL_ENABLED_STATES_RESTORED",0,0);}
+        }finally{removeMonitor(contextEditorMonitor);toggle.invoke(null,getTargetContext(),"python",python);toggle.invoke(null,getTargetContext(),"documents",documents);if(!getTargetContext().getSharedPreferences("saa_builtin_plugins_v1",0).edit().putBoolean("python",python).putBoolean("documents",documents).commit())throw new Check("QA_PREFERENCE_RESTORE_FAILED");status("TOOLS_ORIGINAL_ENABLED_STATES_RESTORED",0,0);}
     }
+    private void pinch(android.view.View view){
+        long time=SystemClock.uptimeMillis();float cx=view.getWidth()/2f,cy=view.getHeight()/2f;
+        android.view.MotionEvent.PointerProperties[] properties=new android.view.MotionEvent.PointerProperties[2];android.view.MotionEvent.PointerCoords[] coordinates=new android.view.MotionEvent.PointerCoords[2];
+        for(int n=0;n<2;n++){properties[n]=new android.view.MotionEvent.PointerProperties();properties[n].id=n;properties[n].toolType=android.view.MotionEvent.TOOL_TYPE_FINGER;coordinates[n]=new android.view.MotionEvent.PointerCoords();coordinates[n].pressure=1;coordinates[n].size=1;coordinates[n].y=cy;}
+        for(int step=0;step<16;step++){float half=100+step*26;coordinates[0].x=cx-half;coordinates[1].x=cx+half;int action=step==0?android.view.MotionEvent.ACTION_DOWN:step==1?android.view.MotionEvent.ACTION_POINTER_DOWN|(1<<8):android.view.MotionEvent.ACTION_MOVE;int count=step==0?1:2;android.view.MotionEvent event=android.view.MotionEvent.obtain(time,time+step*16,action,count,properties,coordinates,0,0,1,1,0,0,android.view.InputDevice.SOURCE_TOUCHSCREEN,0);view.dispatchTouchEvent(event);event.recycle();}
+        android.view.MotionEvent up=android.view.MotionEvent.obtain(time,time+300,android.view.MotionEvent.ACTION_UP,cx,cy,0);view.dispatchTouchEvent(up);up.recycle();
+    }
+    private void localSpeech(boolean privateVoice)throws Exception{
+        guard();int id;
+        if(privateVoice){
+            SystemClock.sleep(1500);AtomicReference<Object> selected=new AtomicReference<>();
+            ui(()->{long newest=0;for(Object message:(Iterable<?>)hidden(selfChat,"messages")){
+                if(message==null||!cls("org.telegram.messenger.MessageObject").isInstance(message)||!Boolean.TRUE.equals(message.getClass().getMethod("isVoice").invoke(message)))continue;
+                if(((Number)message.getClass().getMethod("getDialogId").invoke(message)).longValue()!=self)continue;
+                Object owner=field(message,"messageOwner");String caption=String.valueOf(field(owner,"message"));if(caption.startsWith("TG-ru synthetic")||caption.startsWith("FamilyGram synthetic"))continue;
+                long date=((Number)field(owner,"date")).longValue();if(date>newest&&System.currentTimeMillis()/1000-date>=-300&&System.currentTimeMillis()/1000-date<7200){selected.set(message);newest=date;}
+            }});
+            if(selected.get()==null)throw new Check("AUTHORIZED_RECENT_SAVED_VOICE_NOT_FOUND_NO_AUDIO_READ");id=((Number)field(field(selected.get(),"messageOwner"),"id")).intValue();
+        }else{
+            File file=new File(folder,"synthetic-voice.opus");try(InputStream in=getContext().getAssets().open("fixture.opus");OutputStream out=new FileOutputStream(file)){byte[] block=new byte[8192];int n;while((n=in.read(block))!=-1)out.write(block,0,n);}
+            expectedCaption="TG-ru synthetic local speech "+folder.getName();acknowledgedMessage.set(null);acknowledgedId.set(0);
+            Object document=cls("org.telegram.tgnet.TLRPC$TL_document").getConstructor().newInstance();set(document,"id",0L);set(document,"access_hash",0L);set(document,"dc_id",0);set(document,"file_reference",new byte[0]);set(document,"date",(int)(System.currentTimeMillis()/1000));set(document,"mime_type","audio/ogg");set(document,"size",file.length());
+            Object audio=cls("org.telegram.tgnet.TLRPC$TL_documentAttributeAudio").getConstructor().newInstance();set(audio,"voice",true);Field duration=audio.getClass().getField("duration");if(duration.getType()==double.class)duration.setDouble(audio,9.6);else duration.setInt(audio,10);byte[] waveform=new byte[64];java.util.Arrays.fill(waveform,(byte)0x55);set(audio,"waveform",waveform);set(audio,"flags",4);
+            Object name=cls("org.telegram.tgnet.TLRPC$TL_documentAttributeFilename").getConstructor().newInstance();set(name,"file_name","synthetic-voice.ogg");ArrayList<Object> attributes=new ArrayList<>();attributes.add(audio);attributes.add(name);set(document,"attributes",attributes);
+            Class<?> paramsType=cls("org.telegram.messenger.SendMessagesHelper$SendMessageParams");Object params=paramsType.getMethod("of",String.class,long.class).invoke(null,null,self);set(params,"document",document);set(params,"path",file.getAbsolutePath());set(params,"caption",expectedCaption);set(params,"notify",false);
+            Object sender=instance.getClass().getMethod("getSendMessagesHelper").invoke(instance);ui(()->{guard();sender.getClass().getMethod("sendMessage",paramsType).invoke(sender,params);});waitAck("synthetic_voice",30000);id=acknowledgedId.get();
+        }
+        final int target=id;ui(()->selfChat.getClass().getMethod("scrollToMessageId",int.class,int.class,boolean.class,int.class,boolean.class,int.class).invoke(selfChat,target,0,false,0,true,0));
+        AtomicReference<android.view.ViewGroup> cell=new AtomicReference<>();long deadline=SystemClock.elapsedRealtime()+15000;
+        while(cell.get()==null&&SystemClock.elapsedRealtime()<deadline){ui(()->cell.set(messageCell((android.view.View)selfChat.getClass().getMethod("getFragmentView").invoke(selfChat),target)));if(cell.get()==null)SystemClock.sleep(100);}
+        if(cell.get()==null)throw new Check("NATIVE_VOICE_MESSAGE_CELL_NOT_VISIBLE");Object message=cell.get().getClass().getMethod("getMessageObject").invoke(cell.get());
+        if(!Boolean.TRUE.equals(message.getClass().getMethod("isVoice").invoke(message)))throw new Check("SYNTHETIC_ATTACHMENT_NOT_A_VOICE_MESSAGE");
+        int beforeHeight=cell.get().getHeight();AtomicReference<Object> nativeButton=new AtomicReference<>();deadline=SystemClock.elapsedRealtime()+5000;
+        while(nativeButton.get()==null&&SystemClock.elapsedRealtime()<deadline){ui(()->{cell.get().invalidate();nativeButton.set(hidden(cell.get(),"transcribeButton"));});if(nativeButton.get()==null)SystemClock.sleep(100);}
+        if(nativeButton.get()==null||!Boolean.TRUE.equals(hidden(cell.get(),"useTranscribeButton")))throw new Check("NATIVE_TRANSCRIPTION_BUTTON_NOT_SHOWN");
+        ui(()->{Object user=config.getClass().getMethod("getCurrentUser").invoke(config);boolean premium=(Boolean)field(user,"premium");try{set(user,"premium",false);cell.get().getClass().getMethod("updateWaveform").invoke(cell.get());if(!Boolean.TRUE.equals(hidden(cell.get(),"useTranscribeButton"))||(Boolean)cls("org.telegram.ui.Components.TranscribeButton").getMethod("showTranscribeLock",cls("org.telegram.messenger.MessageObject")).invoke(null,message))throw new Check("LOCAL_NATIVE_BUTTON_STILL_REQUIRES_PREMIUM");}finally{set(user,"premium",premium);cell.get().getClass().getMethod("updateWaveform").invoke(cell.get());}});
+        status("NATIVE_BUTTON_NONPREMIUM_GATE_SIMULATION_PASSED_NO_ACCOUNT_CHANGE",0,0);
+        ui(()->{guard();nativeButton.get().getClass().getMethod("onTap").invoke(nativeButton.get());});
+        Class<?> local=cls("org.telegram.messenger.family.FamilyVoiceTranscription");AtomicBoolean running=new AtomicBoolean();ui(()->running.set((Boolean)local.getMethod("isRunning",Object.class).invoke(null,message)));
+        if(!running.get())throw new Check("NATIVE_BUTTON_DID_NOT_START_LOCAL_ENGINE");status(privateVoice?"AUTHORIZED_PRIVATE_VOICE_USING_LOCAL_ENGINE_NOT_PREMIUM":"NATIVE_VOICE_BUTTON_STARTED_LOCAL_SYSTEM_ENGINE",0,0);
+        deadline=SystemClock.elapsedRealtime()+360000;long update=SystemClock.elapsedRealtime()+10000;
+        while(running.get()&&SystemClock.elapsedRealtime()<deadline){SystemClock.sleep(100);ui(()->running.set((Boolean)local.getMethod("isRunning",Object.class).invoke(null,message)));if(SystemClock.elapsedRealtime()>=update){status("LOCAL_SYSTEM_VOICE_PROCESSING",0,0);update+=10000;}}
+        if(running.get())throw new Check("NATIVE_LOCAL_VOICE_PROCESSING_TIMEOUT");SystemClock.sleep(500);
+        AtomicReference<String> output=new AtomicReference<>();AtomicBoolean open=new AtomicBoolean();
+        ui(()->{Object currentMessage=cell.get().getClass().getMethod("getMessageObject").invoke(cell.get());Object text=currentMessage.getClass().getMethod("getVoiceTranscription").invoke(currentMessage);output.set(text==null?"":text.toString());open.set((Boolean)currentMessage.getClass().getMethod("isVoiceTranscriptionOpen").invoke(currentMessage));});
+        AtomicBoolean localError=new AtomicBoolean(true);ui(()->{Field cacheField=local.getDeclaredField("CACHE");cacheField.setAccessible(true);for(Object entry:((Map<?,?>)cacheField.get(null)).values()){Object entryMessage=((java.lang.ref.WeakReference<?>)hidden(entry,"message")).get();if(entryMessage!=null&&((Number)field(field(entryMessage,"messageOwner"),"id")).intValue()==target&&((Number)entryMessage.getClass().getMethod("getDialogId").invoke(entryMessage)).longValue()==self)localError.set((Boolean)hidden(entry,"error"));}});
+        String value=output.get();if(!open.get()||localError.get()||value==null||value.trim().isEmpty())throw new Check("NATIVE_TRANSCRIPTION_BUBBLE_NOT_COMPLETED");
+        if(!privateVoice){String lower=value.toLowerCase(java.util.Locale.ROOT);if(!lower.contains("телефон")||!lower.contains("плюс")||!(lower.contains("4")||lower.contains("четыре")))throw new Check("NATIVE_SYNTHETIC_TRANSCRIPT_INCOMPLETE");ui(()->saveView(cell.get(),"native-local-speech-bubble.png"));}
+        if(current!=launch)throw new Check("LOCAL_TRANSCRIPTION_OPENED_SEPARATE_ACTIVITY");
+        status(privateVoice?"AUTHORIZED_PRIVATE_VOICE_LOCAL_RESULT_VISIBLE_NO_CONTENT_LOGGED":"REAL_OPUS_VOICE_LOCAL_FULL_RUSSIAN_NATIVE_BUBBLE_PASSED",0,0);
+    }
+    private android.view.ViewGroup messageCell(android.view.View view,int id)throws Exception{
+        if(cls("org.telegram.ui.Cells.ChatMessageCell").isInstance(view)){Object message=view.getClass().getMethod("getMessageObject").invoke(view);if(message!=null&&((Number)field(field(message,"messageOwner"),"id")).intValue()==id)return (android.view.ViewGroup)view;}
+        if(view instanceof android.view.ViewGroup){android.view.ViewGroup group=(android.view.ViewGroup)view;for(int n=0;n<group.getChildCount();n++){android.view.ViewGroup result=messageCell(group.getChildAt(n),id);if(result!=null)return result;}}return null;
+    }
+    private void inlinePython()throws Exception{
+        guard();Class<?> tools=cls("org.telegram.messenger.family.FamilyChatTools");Method enabled=tools.getMethod("enabled",android.content.Context.class,String.class),toggle=tools.getMethod("setEnabled",android.content.Context.class,String.class,boolean.class);
+        boolean before=(Boolean)enabled.invoke(null,getTargetContext(),"python");
+        try{
+            toggle.invoke(null,getTargetContext(),"python",true);
+            for(String code:new String[]{"python\nprint(1+1)","print(no_such_local_name)","print(1/0)","for:","print(\"\\n\".join(\"SAA_QA_LINE_\"+str(n) for n in range(30)))","while True: pass # SAA_QA_TIMEOUT","while True: pass # SAA_QA_STOP"}){
+                expectedCaption=code;acknowledgedMessage.set(null);acknowledgedId.set(0);
+                Class<?> paramsType=cls("org.telegram.messenger.SendMessagesHelper$SendMessageParams");Object params=paramsType.getMethod("of",String.class,long.class).invoke(null,code,self);set(params,"notify",false);
+                Object entity=cls("org.telegram.tgnet.TLRPC$TL_messageEntityPre").getConstructor().newInstance();set(entity,"offset",0);set(entity,"length",code.length());set(entity,"language","python");ArrayList<Object> entities=new ArrayList<>();entities.add(entity);set(params,"entities",entities);
+                Object sender=instance.getClass().getMethod("getSendMessagesHelper").invoke(instance);ui(()->{guard();sender.getClass().getMethod("sendMessage",paramsType).invoke(sender,params);});
+                long deadline=SystemClock.elapsedRealtime()+30000;while(acknowledgedMessage.get()==null&&SystemClock.elapsedRealtime()<deadline)SystemClock.sleep(100);if(acknowledgedMessage.get()==null)throw new Check("INLINE_SELF_CODE_ACK_TIMEOUT");
+                int id=acknowledgedId.get();ui(()->selfChat.getClass().getMethod("scrollToLastMessage",boolean.class,boolean.class).invoke(selfChat,false,false));
+                AtomicReference<android.view.ViewGroup> panel=new AtomicReference<>();deadline=SystemClock.elapsedRealtime()+10000;
+                while(panel.get()==null&&SystemClock.elapsedRealtime()<deadline){ui(()->panel.set(inlinePanel((android.view.View)selfChat.getClass().getMethod("getFragmentView").invoke(selfChat),id)));if(panel.get()==null)SystemClock.sleep(100);}
+                if(panel.get()==null)throw new Check("ACTUAL_INLINE_PANEL_NOT_FOUND");
+                AtomicReference<android.widget.Button> button=new AtomicReference<>();ui(()->{button.set(panelButton(panel.get()));if(button.get()==null||!button.get().isShown())throw new Check("INLINE_RUN_BUTTON_NOT_VISIBLE");button.get().performClick();});
+                if(code.contains("SAA_QA_STOP")){SystemClock.sleep(1000);ui(()->{if(!button.get().getText().toString().contains("Остановить"))throw new Check("INLINE_STOP_BUTTON_MISSING");button.get().performClick();});}
+                String expected=code.contains("SAA_QA_STOP")?"останов":code.contains("SAA_QA_TIMEOUT")?"10 секунд":code.contains("no_such_local_name")?"nameerror":code.contains("1/0")?"zerodivisionerror":code.equals("for:")?"syntaxerror":code.contains("SAA_QA_LINE")?"saa_qa_line_29":"2";AtomicBoolean found=new AtomicBoolean();deadline=SystemClock.elapsedRealtime()+45000;
+                while(!found.get()&&SystemClock.elapsedRealtime()<deadline){ui(()->found.set(panelOutput(panel.get(),expected)));if(!found.get())SystemClock.sleep(100);}
+                if(!found.get())throw new Check("INLINE_PYTHON_RESULT_NOT_VISIBLE");
+                if(current!=launch)throw new Check("INLINE_PYTHON_OPENED_ANOTHER_ACTIVITY");
+                ui(()->{
+                    if(panel.get().getWidth()<getTargetContext().getResources().getDisplayMetrics().widthPixels*.75f)throw new Check("INLINE_OUTPUT_STILL_TOO_NARROW");
+                    if(expected.equals("2")){saveView(panel.get(),"python-inline-result.png");saveView((android.view.View)panel.get().getParent(),"python-inline-message.png");}
+                    if(expected.equals("nameerror"))saveView(panel.get(),"python-inline-error.png");
+                    if(expected.equals("10 секунд"))saveView(panel.get(),"python-inline-timeout.png");
+                    if(code.contains("SAA_QA_LINE")){android.widget.Button expand=buttonText(panel.get(),"Развернуть вывод");if(expand==null||!expand.isShown())throw new Check("LONG_OUTPUT_EXPAND_BUTTON_MISSING");expand.performClick();android.app.AlertDialog dialog=(android.app.AlertDialog)hidden(panel.get(),"expanded");if(dialog==null||!dialog.isShowing())throw new Check("OUTPUT_NOT_EXPANDED_INSIDE_CHAT");}
+                });
+                if(code.contains("SAA_QA_LINE")){SystemClock.sleep(300);ui(()->{android.app.AlertDialog dialog=(android.app.AlertDialog)hidden(panel.get(),"expanded");saveView(dialog.getWindow().getDecorView(),"python-inline-expanded.png");dialog.dismiss();});}
+                status(expected.equals("2")?"INLINE_ACTUAL_MESSAGE_RUN_2_WITHOUT_EDITOR_PASSED":expected.equals("10 секунд")?"INLINE_EXECUTION_TIMEOUT_EXPLICIT_TEN_SECONDS_PASSED":code.contains("SAA_QA_LINE")?"INLINE_WIDE_LARGE_OUTPUT_NATIVE_EXPAND_PASSED":code.contains("SAA_QA_STOP")?"INLINE_NATIVE_STOP_CANCELLED_OWN_WORKER_PASSED":"INLINE_ORIGINAL_PYTHON_EXCEPTION_VISIBLE_PASSED",0,0);
+                toggle.invoke(null,getTargetContext(),"python",false);SystemClock.sleep(150);
+                AtomicBoolean hidden=new AtomicBoolean();ui(()->hidden.set(panel.get().getVisibility()!=android.view.View.VISIBLE||panel.get().getMeasuredHeight()==0));if(!hidden.get())throw new Check("INLINE_PLUGIN_OFF_PANEL_STILL_VISIBLE");
+                toggle.invoke(null,getTargetContext(),"python",true);SystemClock.sleep(250);
+            }
+        }finally{getTargetContext().getSharedPreferences("saa_builtin_plugins_v1",0).edit().putBoolean("python",before).commit();}
+    }
+    private android.view.ViewGroup inlinePanel(android.view.View view,int id)throws Exception{
+        if(cls("org.telegram.ui.Cells.ChatMessageCell").isInstance(view)){
+            Object message=view.getClass().getMethod("getMessageObject").invoke(view);
+            if(message!=null&&((Number)field(field(message,"messageOwner"),"id")).intValue()==id){android.view.ViewGroup group=(android.view.ViewGroup)view;for(int n=0;n<group.getChildCount();n++)if(group.getChildAt(n).getClass().getName().equals("org.telegram.messenger.family.FamilyInlinePython$Panel"))return (android.view.ViewGroup)group.getChildAt(n);}
+        }
+        if(view instanceof android.view.ViewGroup){android.view.ViewGroup group=(android.view.ViewGroup)view;for(int n=0;n<group.getChildCount();n++){android.view.ViewGroup result=inlinePanel(group.getChildAt(n),id);if(result!=null)return result;}}return null;
+    }
+    private android.widget.Button panelButton(android.view.View view){if(view instanceof android.widget.Button)return (android.widget.Button)view;if(view instanceof android.view.ViewGroup){android.view.ViewGroup group=(android.view.ViewGroup)view;for(int n=0;n<group.getChildCount();n++){android.widget.Button found=panelButton(group.getChildAt(n));if(found!=null)return found;}}return null;}
+    private android.widget.Button buttonText(android.view.View view,String text){if(view instanceof android.widget.Button&&((android.widget.Button)view).getText().toString().equals(text))return (android.widget.Button)view;if(view instanceof android.view.ViewGroup){android.view.ViewGroup group=(android.view.ViewGroup)view;for(int n=0;n<group.getChildCount();n++){android.widget.Button found=buttonText(group.getChildAt(n),text);if(found!=null)return found;}}return null;}
+    private boolean panelOutput(android.view.View view,String expected){if(view instanceof android.widget.TextView&&!(view instanceof android.widget.Button)){String text=((android.widget.TextView)view).getText().toString().trim();if(expected.equals("2")?text.equals("2"):text.toLowerCase(java.util.Locale.ROOT).contains(expected))return true;}if(view instanceof android.view.ViewGroup){android.view.ViewGroup group=(android.view.ViewGroup)view;for(int n=0;n<group.getChildCount();n++)if(panelOutput(group.getChildAt(n),expected))return true;}return false;}
     private org.json.JSONObject ownerAction(String command,String id)throws Exception{
         Class<?> access=cls("org.telegram.messenger.family.FamilyAccess");Method proof=access.getDeclaredMethod("proofRequest",String.class,String.class,org.json.JSONObject.class);proof.setAccessible(true);
         org.json.JSONObject payload=new org.json.JSONObject().put("command",command);if(command.equals("invite"))payload.put("hours",1);else if(!command.equals("list"))payload.put("device_id",id);
@@ -316,6 +451,9 @@ public final class SavedMediaDiagnostic extends Instrumentation {
         }finally{if(id!=null&&!revoked)ownerAction("revoke",id);}
     }
     private void finalizeSettings()throws Exception{
+        Class<?> tools=cls("org.telegram.messenger.family.FamilyChatTools");Method enabled=tools.getMethod("enabled",android.content.Context.class,String.class),toggle=tools.getMethod("setEnabled",android.content.Context.class,String.class,boolean.class);
+        boolean python=(Boolean)enabled.invoke(null,getTargetContext(),"python"),documents=(Boolean)enabled.invoke(null,getTargetContext(),"documents");
+        try{
         guard();if(!getTargetContext().getPackageManager().getApplicationLabel(getTargetContext().getApplicationInfo()).toString().equals("TG-ru"))throw new Check("APPLICATION_LABEL_MISMATCH");
         SystemClock.sleep(1200); // Let the preceding Saved Messages navigation animation finish.
         AtomicReference<Object> dialogs=new AtomicReference<>();
@@ -369,16 +507,16 @@ public final class SavedMediaDiagnostic extends Instrumentation {
         });
         Activity fromSettings=waitActivity("FamilyPrivacyActivity");ui(fromSettings::finish);
         status("STANDARD_SETTINGS_GHOST_PLUGINS_OWNER_AND_SYSTEM_LAST_PASSED",0,0);
-        if(!getTargetContext().getSharedPreferences("saa_builtin_plugins_v1",0).edit().putBoolean("python",false).putBoolean("documents",false).commit())throw new Check("QA_DEFAULT_STATE_COMMIT_FAILED");
         ui(()->getTargetContext().startActivity(new Intent().setClassName("com.salatik.familygram","org.telegram.messenger.family.FamilyPluginsActivity").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)));
-        Activity plugins=waitActivity("FamilyPluginsActivity");SystemClock.sleep(300);screenshot(plugins,"plugins-disabled.png");
-        int[] switches=new int[2];ui(()->countSwitches(plugins.getWindow().getDecorView(),switches));if(switches[0]!=2||switches[1]!=0)throw new Check("BUNDLED_TOOLS_NOT_BOTH_DISABLED_IN_UI");ui(plugins::finish);
+        Activity plugins=waitActivity("FamilyPluginsActivity");SystemClock.sleep(300);screenshot(plugins,"plugins-original-choices.png");
+        int[] switches=new int[2];ui(()->countSwitches(plugins.getWindow().getDecorView(),switches));if(switches[0]!=2||switches[1]!=(python?1:0)+(documents?1:0)||(Boolean)enabled.invoke(null,getTargetContext(),"python")!=python||(Boolean)enabled.invoke(null,getTargetContext(),"documents")!=documents)throw new Check("BUNDLED_TOOLS_ORIGINAL_CHOICES_NOT_PRESERVED_IN_UI");ui(plugins::finish);
         ui(()->getTargetContext().startActivity(new Intent().setClassName("com.salatik.familygram","org.telegram.messenger.family.FamilySettingsActivity").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)));
         Activity settings=waitActivity("FamilySettingsActivity");SystemClock.sleep(300);screenshot(settings,"system-settings.png");ui(settings::finish);
         ui(()->getTargetContext().startActivity(new Intent().setClassName("com.salatik.familygram","org.telegram.messenger.family.FamilyDevicesActivity").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)));
         Activity devices=waitActivity("FamilyDevicesActivity");long deadline=SystemClock.elapsedRealtime()+15000;while((Boolean)hidden(devices,"busy")&&SystemClock.elapsedRealtime()<deadline)SystemClock.sleep(100);
         if((Boolean)hidden(devices,"busy")||((android.widget.LinearLayout)hidden(devices,"list")).getChildCount()<2)throw new Check("OWNER_DEVICES_UI_NOT_LOADED");
-        status("BOUND_OWNER_UI_LOADED_AND_BOTH_PLUGINS_DISABLED_PASSED",0,0);
+        status("BOUND_OWNER_UI_LOADED_AND_ORIGINAL_PLUGIN_CHOICES_PRESERVED_PASSED",0,0);
+        }finally{toggle.invoke(null,getTargetContext(),"python",python);toggle.invoke(null,getTargetContext(),"documents",documents);if(!getTargetContext().getSharedPreferences("saa_builtin_plugins_v1",0).edit().putBoolean("python",python).putBoolean("documents",documents).commit())throw new Check("QA_FINALIZE_PREFERENCE_RESTORE_FAILED");status("FINALIZE_ORIGINAL_PLUGIN_CHOICES_RESTORED",0,0);}
     }
     private void saveView(android.view.View view,String name)throws Exception{
         if(view.getWidth()<1||view.getHeight()<1)throw new Check("SYNTHETIC_VIEW_LAYOUT_EMPTY");

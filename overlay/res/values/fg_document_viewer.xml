@@ -1,0 +1,12 @@
+<resources>
+ <string name="fg_document_zoom">Масштаб</string>
+ <string name="fg_document_fit">Вписать страницу</string>
+ <string name="fg_document_fit_width">По ширине экрана</string>
+ <string name="fg_document_jump">Перейти к странице</string>
+ <string name="fg_document_page_hint">Номер страницы от 1 до %1$d</string>
+ <string name="fg_document_zoom_hint">Разведите пальцы для увеличения. Двойной тап приближает страницу.</string>
+ <string name="fg_document_format_notice">Оформление сохранено по возможности. Сложная вёрстка может отличаться от Word.</string>
+ <string name="fg_document_zoom_in">Увеличить</string>
+ <string name="fg_document_zoom_out">Уменьшить</string>
+ <string name="fg_document_copy">Скопировать текст</string>
+</resources>

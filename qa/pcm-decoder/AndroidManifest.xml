@@ -1,0 +1,5 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.salatik.familygram.codeccheck">
+    <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="35" />
+    <application android:label="Local codec fixtures" android:testOnly="true" android:allowBackup="false" android:usesCleartextTraffic="false" />
+    <instrumentation android:name="com.salatik.familygram.codeccheck.CodecDiagnostic" android:targetPackage="com.salatik.familygram.codeccheck" android:functionalTest="true" android:handleProfiling="false" />
+</manifest>

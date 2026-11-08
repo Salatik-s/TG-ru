@@ -6,7 +6,7 @@
   <string name="fg_builtin_enable_first">Сначала включите дополнение</string>
   <string name="fg_other_plugins">Другие плагины и установка из файла</string>
   <string name="fg_python_runner">Python в чате</string>
-  <string name="fg_python_summary">Запускайте Python из меню сообщения с блоком кода. Код работает локально, без сети и доступа к Telegram. Лимит: 5 секунд, память до 256 МБ.</string>
+  <string name="fg_python_summary">Кнопка запуска и результат прямо под блоком Python в чате. Код работает локально, без сети и доступа к Telegram. Выполнение останавливается через 10 секунд.</string>
   <string name="fg_python_code">Код Python</string>
   <string name="fg_python_input">Ввод для input() · по одной строке</string>
   <string name="fg_python_run">Запустить</string>
@@ -14,7 +14,7 @@
   <string name="fg_python_loading">Запускаем локальный Python…</string>
   <string name="fg_python_ready">Готово. Нажмите «Запустить», чтобы выполнить код.</string>
   <string name="fg_python_running">Код выполняется…</string>
-  <string name="fg_python_timeout">Выполнение остановлено: превышен лимит времени.</string>
+  <string name="fg_python_timeout">Выполнение остановлено: превышен лимит 10 секунд.</string>
   <string name="fg_python_memory_error">Python остановлен: не хватило памяти. Откройте дополнение заново.</string>
   <string name="fg_python_failed">Не удалось запустить Python. Откройте дополнение заново.</string>
   <string name="fg_python_cancelled">Выполнение остановлено</string>
