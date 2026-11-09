@@ -13,15 +13,17 @@ def patch(raw):
         raise ValueError("Call manager input hash mismatch")
     source = raw.decode("utf-8")
     for method, body in {
-        "ringingStatesUpdated": "",
+        "ringingStatesUpdated": "        return\n",
         "startCall": "        return .single(false)\n",
         "requestCall": "        self.showFamilyCallsUnavailable(context: context)\n        return .requested\n",
         "scheduleGroupCall": "        self.showFamilyCallsUnavailable(context: context)\n        return .success\n",
         "joinGroupCall": "        self.showFamilyCallsUnavailable(context: context)\n        return .joined\n",
         "joinConferenceCall": "        self.showFamilyCallsUnavailable(context: accountContext)\n        return .joined\n",
     }.items():
-        pattern = rf"(^    (?:public|private) func {method}\(.*?\{{\n).*?^    \}}"
-        source, count = re.subn(pattern, lambda m: m[1] + body + "    }", source, flags=re.M | re.S)
+        pattern = rf"^    (?:public|private) func {method}\(.*?\{{\n"
+        indented_body = "".join("    " + line for line in body.splitlines(keepends=True))
+        guard = "        guard self.familyCallTransportAvailable else {\n" + indented_body + "        }\n"
+        source, count = re.subn(pattern, lambda m: m[0] + guard, source, flags=re.M | re.S)
         if count != 1:
             raise ValueError("Call manager method changed: " + method)
     assignment = "        self.callKitIntegration = CallKitIntegration.shared"
@@ -29,7 +31,9 @@ def patch(raw):
     if source.count(assignment) != 1 or source.count(anchor) != 1:
         raise ValueError("Call manager anchor changed")
     source = source.replace(assignment, "        self.callKitIntegration = nil")
-    source = source.replace(anchor, '''    private func showFamilyCallsUnavailable(context: AccountContext) {
+    source = source.replace(anchor, '''    private var familyCallTransportAvailable: Bool { false }
+
+    private func showFamilyCallsUnavailable(context: AccountContext) {
         let (presentationData, present, _) = self.getDeviceAccessData()
         present(textAlertController(sharedContext: context.sharedContext,
             title: presentationData.strings.Call_StatusFailed,

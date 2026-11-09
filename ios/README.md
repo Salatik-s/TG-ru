@@ -4,7 +4,7 @@ Native fork of the complete official Telegram-iOS application. This workspace is
 from Android and the family server. It is not a web-client wrapper.
 
 Upstream and build tool versions are pinned in upstream-lock.json. The workflow is manual
-only. No signing identity or Apple account belongs in CI. The default compile-only mode
+only. No signing identity or Apple account belongs in CI. The compile-only mode
 uses explicit invalid dummy API values and produces BASELINE-NOT-CONNECTED.ipa, not a
 connected client. The own-api mode requires your own TG_API_ID and TG_API_HASH repository
 secrets; missing, dummy or malformed credentials stop before upstream checkout.
@@ -29,12 +29,14 @@ Background push and incoming calls are not promised for free weekly signing.
 
 ## Integration
 
-Source directories transport/, access/, features/, family-core/ and family-ui/ are copied into the pinned checkout
-only when present. Patches supplied by other agents are applied by the explicit
-build-support/integration.json manifest. Unknown or unlisted scripts never run.
-Every applied source patch and copied file is recorded in the build manifest.
-The baseline build is not a complete protected FamilyGram client until gate and transport
-integration is present and tested. Do not distribute it as a production replacement.
+The build applies the pinned transport, privacy, chat features, access gate and call
+restrictions in the order listed in build-support/integration.json. The build manifest
+records each applied patch and copied file. The IPA check also validates the packaged
+Python runtime and the on-device speech permission text.
+
+The compile-only app keeps its access gate locked. The own-api app requires approval
+from the existing family server before the Telegram transport can connect. Voice,
+video and group calls are unavailable while their media route is unverified.
 
 The user signs on their computer using the same bundle identifier and Apple account for
 updates. Apple Personal Team profiles expire after seven days. Keep account credentials
@@ -46,8 +48,8 @@ python build-support/test_build.py
 
 These checks exercise source pin/patch preconditions, Personal Team storage patches,
 unsigned configuration, credential validation and IPA layout validation without an Apple SDK.
-They do not compile Swift. The separate macOS unit job runs swift test for family-core and
-transport before any credentials or large upstream checkout are needed.
+The macOS unit job runs the Swift tests for family-core, transport and privacy. It also
+type-checks the native access gate against the iOS Simulator SDK in both build modes.
 
 ## Save your own API configuration on Windows
 

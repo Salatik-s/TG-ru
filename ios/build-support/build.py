@@ -96,7 +96,7 @@ def build(number, compile_only=False):
                                 '--//Telegram:disableProvisioningProfiles', '--//Telegram:disableExtensions',
                                 '--jobs=3']
         if compile_only:
-            command.common_args += ['--swiftcopt=-DFAMILY_COMPILE_ONLY', '--copt=-DFAMILY_COMPILE_ONLY=1']
+            command.common_args += ['--@build_bazel_rules_swift//swift:copt=-DFAMILY_COMPILE_ONLY']
         command.set_configuration('release_arm64')
         command.set_build_number(number)
         command.invoke_build()  # Full upstream Telegram/Telegram target, unchanged target selection.

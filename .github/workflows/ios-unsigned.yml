@@ -46,8 +46,8 @@ jobs:
         run: python3 build-support/test_build.py
       - name: Check exact toolchain and own credentials before upstream download
         env:
-          TG_API_ID: ${{ secrets.TG_API_ID }}
-          TG_API_HASH: ${{ secrets.TG_API_HASH }}
+          TG_API_ID: ${{ inputs.mode == 'own-api' && secrets.TG_API_ID || '' }}
+          TG_API_HASH: ${{ inputs.mode == 'own-api' && secrets.TG_API_HASH || '' }}
         run: |
           args=()
           if [ "${{ inputs.mode }}" = "compile-only" ]; then args+=(--compile-only); fi
@@ -63,8 +63,8 @@ jobs:
           persist-credentials: false
       - name: Build complete arm64 application
         env:
-          TG_API_ID: ${{ secrets.TG_API_ID }}
-          TG_API_HASH: ${{ secrets.TG_API_HASH }}
+          TG_API_ID: ${{ inputs.mode == 'own-api' && secrets.TG_API_ID || '' }}
+          TG_API_HASH: ${{ inputs.mode == 'own-api' && secrets.TG_API_HASH || '' }}
         run: |
           args=()
           if [ "${{ inputs.mode }}" = "compile-only" ]; then args+=(--compile-only); fi

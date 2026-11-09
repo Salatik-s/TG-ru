@@ -36,7 +36,7 @@
     },
     {
       "path": "patches/calls.py",
-      "sha256": "125ebf899fa92a9d4325d7b79783effd4a8367d30b217d02f222f5b53a78791d",
+      "sha256": "f2ddd8b27d41971d870c9b1b663f7b16427165d8c1cf37d4ae7c0e85ad6f4d8c",
       "args": [
         "--source",
         "{upstream}"
