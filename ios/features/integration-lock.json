@@ -11,7 +11,7 @@
     "submodules/ChatListUI/BUILD": "1fa16fef6c51bedb82a985780b18ef92663b9b02b81cc0afbb2b7dce192f7cc0"
   },
   "helpers": {
-    "speech/FamilyLocalSpeech.swift": "c7ceaa4b3b309b1ef02ba643229239285fec9dcef540ed50249b08e69072f817",
+    "speech/FamilyLocalSpeech.swift": "6754327750d4d7acc69d5783c1ca922fe2029526769478f271101604c4bf661c",
     "documents/FamilyPDFController.swift": "6a3b51e21dd53a1735477fdd6ce1b22eef6f3f1ab0c83473648991f76191e69a",
     "settings/FamilyFeatureSettingsController.swift": "d0efebc1b6e51ac25ab34843da74107ed334752632ef59d4a3099dfc0316416c",
     "python/FamilyPythonInlineView.swift": "b9c858a7597d6fbf2770b43f4fa63e9d909daf97af03d4a162e7bf5a3b7e2aa6",

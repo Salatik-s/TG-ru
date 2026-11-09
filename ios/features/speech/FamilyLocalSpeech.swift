@@ -1,12 +1,12 @@
 import Foundation
-import AVFoundation
+@preconcurrency import AVFoundation
 import Speech
 import UIKit
 import SwiftSignalKit
 
 public var familyLocalSpeechEnabled: Bool { UserDefaults.standard.bool(forKey: "family.features.localSpeech") }
 
-public enum FamilySpeechFailure: Error {
+public enum FamilySpeechFailure: Error, Sendable {
     case unavailable, permission, missingFile, tooLong, invalidAudio, timeout, empty, busy
     public var text: String {
         switch self {
@@ -22,7 +22,7 @@ public enum FamilySpeechFailure: Error {
     }
 }
 
-public enum FamilySpeechResult {
+public enum FamilySpeechResult: Sendable {
     case success(String)
     case failure(FamilySpeechFailure)
 }
@@ -110,7 +110,7 @@ private final class FamilySpeechJob {
                         DispatchQueue.global(qos: .userInitiated).async {
                             do {
                                 try self.writePCM(asset: asset, track: track)
-                                DispatchQueue.main.async { self.recognize(using: recognizer) }
+                                DispatchQueue.main.async { self.recognize() }
                             } catch {
                                 try? FileManager.default.removeItem(at: self.temporary)
                                 DispatchQueue.main.async { self.finish(.failure(error as? FamilySpeechFailure ?? .invalidAudio)) }
@@ -161,8 +161,8 @@ private final class FamilySpeechJob {
         try wav.write(to: temporary, options: [.atomic, .completeFileProtection])
         if isCancelled { try? FileManager.default.removeItem(at: temporary); throw FamilySpeechFailure.timeout }
     }
-    private func recognize(using recognizer: SFSpeechRecognizer) {
-        guard !finished, !isCancelled, recognizer.isAvailable, recognizer.supportsOnDeviceRecognition else {
+    private func recognize() {
+        guard !finished, !isCancelled, let recognizer, recognizer.isAvailable, recognizer.supportsOnDeviceRecognition else {
             try? FileManager.default.removeItem(at: temporary); finish(.failure(.unavailable)); return
         }
         let request = SFSpeechURLRecognitionRequest(url: temporary)
@@ -170,13 +170,16 @@ private final class FamilySpeechJob {
         request.shouldReportPartialResults = false
         if #available(iOS 16.0, *) { request.addsPunctuation = true }
         speech = recognizer.recognitionTask(with: request) { [weak self] result, error in
-            DispatchQueue.main.async {
-                guard let self, !self.finished else { return }
-                if let result, result.isFinal {
-                    let text = result.bestTranscription.formattedString.trimmingCharacters(in: .whitespacesAndNewlines)
-                    self.finish(text.isEmpty ? .failure(.empty) : .success(String(text.prefix(65536))))
-                } else if error != nil { self.finish(.failure(.unavailable)) }
+            let outcome: FamilySpeechResult
+            if let result, result.isFinal {
+                let text = result.bestTranscription.formattedString.trimmingCharacters(in: .whitespacesAndNewlines)
+                outcome = text.isEmpty ? .failure(.empty) : .success(String(text.prefix(65536)))
+            } else if error != nil {
+                outcome = .failure(.unavailable)
+            } else {
+                return
             }
+            DispatchQueue.main.async { self?.finish(outcome) }
         }
     }
     private func finish(_ result: FamilySpeechResult?) {
