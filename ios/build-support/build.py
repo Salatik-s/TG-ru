@@ -64,7 +64,9 @@ def build(number, compile_only=False):
         raise ValueError('Rules Apple commit mismatch')
     report = prepare(source, compile_only=compile_only)
     report['patches'].append(prepare_unsigned_rules(source))
-    changed = capture('git', '-C', str(source), 'diff', '--name-only').splitlines()
+    # The exact changed rules_apple file is already recorded above. Git reports
+    # the dirty submodule as a directory, which cannot be hashed as a file.
+    changed = capture('git', '-C', str(source), 'diff', '--ignore-submodules=dirty', '--name-only').splitlines()
     report['final_modified_sources'] = [{'path': relative, 'sha256': digest(source / relative)} for relative in changed]
     bazel = download_bazel(source)
     configuration = emit(source, bazel, compile_only=compile_only)
