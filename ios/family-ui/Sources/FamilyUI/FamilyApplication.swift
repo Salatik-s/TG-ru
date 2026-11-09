@@ -11,7 +11,7 @@ import FamilyTransport
         bootstrap = Bootstrap(host: host)
     }
 
-    private final class Bootstrap {
+    @MainActor private final class Bootstrap {
         weak var host: UIWindow?
         let gate: FamilyGateWindow
         var foreground: NSObjectProtocol?

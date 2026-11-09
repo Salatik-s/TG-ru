@@ -1,0 +1,16 @@
+{
+  "version": "314.0.7",
+  "files": {
+    "controller.mjs": "7f7bf955120dbfad24b293d3673b4b2e47e4c32e4e735bc77d2bcc07cd824fdd",
+    "index.html": "fb80d90ffb491821200ab8ef7ff78d01e7b8801651bdaaa30a537e10334317e6",
+    "worker.mjs": "2bf67dd9cf0af70be8efbdacb5180c54cb2b3bc89f8a8a0790c7129ae13a2722",
+    "runtime/provenance.json": "c963e81dbb7a1ed8d27f7a803a1713a847a3eae74984295080896b5aa1c6e741",
+    "runtime/PYODIDE-LICENSE.txt": "1f256ecad192880510e84ad60474eab7589218784b9a50bc7ceee34c2b91f1d5",
+    "runtime/pyodide-lock.json": "5dc2fc119108bc148c7457dc86e7675b5c87e1cafd420b9c34c1eaef7b36c010",
+    "runtime/pyodide.asm.mjs": "f7cdc8ece80678ceb712f8e65ebe6d3a83203a180c399865f49612a051693635",
+    "runtime/pyodide.asm.wasm": "2af4e3ab95e26f4aa78751b5fe613b0c1722c5f72c0f92f46d9f554fd28ba004",
+    "runtime/pyodide.mjs": "6f1d60f7bf529beb300f0f47983c921d3982363640ba20af0e38efdddbc66109",
+    "runtime/PYTHON-LICENSE.txt": "b0e25a78cffb43f4d92de8b61ccfa1f1f98ecbc22330b54b5251e7b6ba010231",
+    "runtime/python_stdlib.zip": "fa1957e5777068fc4f7437f96d860ae2fbe9c19732ba06c84e004ec16dd7dd7a"
+  }
+}

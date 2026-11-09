@@ -112,7 +112,7 @@ class BuildTests(unittest.TestCase):
         workflow = ROOT / '.github/workflows/ios-unsigned.yml'
         if not workflow.is_file():
             workflow = ROOT.parent / '.github/workflows/ios-unsigned.yml'
-        source = workflow.read_text(encoding='utf-8')
+        source = workflow.read_text()
         self.assertIn('workflow_dispatch:', source)
         self.assertNotIn('pull_request:', source)
         self.assertNotIn('push:', source)

@@ -29,6 +29,8 @@ jobs:
       - run: python3 build-support/test_build.py
       - run: swift test --package-path family-core
       - run: swift test --package-path transport
+      - run: swift test --package-path privacy
+      - run: python3 build-support/check_native_ui.py
   build:
     needs: unit
     if: ${{ inputs.mode != 'unit-only' }}

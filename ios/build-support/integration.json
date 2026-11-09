@@ -1,4 +1,46 @@
 {
   "version": 1,
-  "scripts": []
+  "scripts": [
+    {
+      "path": "patches/network.py",
+      "sha256": "f8ee484e208dc390b63f832e71a99fcc0b5a6896a331801f953720a46040440f",
+      "args": [
+        "{upstream}",
+        "--apply"
+      ]
+    },
+    {
+      "path": "patches/privacy.py",
+      "sha256": "dadbdb6d97074a14dacd35bff579da7847d38afc940996745263ed7cf3bdd826",
+      "args": [
+        "--checkout",
+        "{upstream}",
+        "--apply"
+      ]
+    },
+    {
+      "path": "patches/features.py",
+      "sha256": "683ba83c826a44d7f1d29786cb23a9972f446b9db8fa6744f28d11fe9c14711a",
+      "args": [
+        "--checkout",
+        "{upstream}"
+      ]
+    },
+    {
+      "path": "patches/access.py",
+      "sha256": "7f35adc6f3c1e52a1260c7cfac164e2d37ccf6b9aef495daf2e88f99aa1c258a",
+      "args": [
+        "--source",
+        "{upstream}"
+      ]
+    },
+    {
+      "path": "patches/calls.py",
+      "sha256": "125ebf899fa92a9d4325d7b79783effd4a8367d30b217d02f222f5b53a78791d",
+      "args": [
+        "--source",
+        "{upstream}"
+      ]
+    }
+  ]
 }

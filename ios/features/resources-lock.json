@@ -1,0 +1,18 @@
+{
+  "rules_apple_commit": "485016eb5b0948cc17307064e7977a6d68e94046",
+  "upstream_commit": "24638bc69bd083981b178dd1e7f921eebbf7fc46",
+  "builds": {
+    "3fad60336364ae1aa7f38d8a3f60b9fb524a8f3ea3336778a66047f71d06f50a": {
+      "variant": "official",
+      "after_sha256": "67a2e9fabe03d0a1e1eaa28d78216d29220add261d3ae703af53160d03b59439"
+    },
+    "60bfacb1be6d821cc15088dcc9c781939efdcf1e83741e4998db848658c57f45": {
+      "variant": "personal_team",
+      "after_sha256": "6ef0293b70572dcf35399a41b70147d924b7aa4b72d1efaddc7a453b817bd153"
+    },
+    "e446fdf90a919b113c5c9f34800e71a58c2d7cf5ac98fda3685bd352887c0a1c": {
+      "variant": "personal_team_compile_only",
+      "after_sha256": "2947de3fb5b78f896c64c1ea93e86a2507381a622750da33f7b1aeeb33c16bfe"
+    }
+  }
+}

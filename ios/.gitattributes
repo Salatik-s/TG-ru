@@ -1,0 +1,8 @@
+# Exact-byte snapshots and bundled resources are validated by SHA-256.
+build-support/upstream-fixtures/** -text
+calls/fixtures/** -text
+patches/network-fixtures/** -text
+privacy/fixtures/** -text
+features/python/Resources/family-python/runner/** -text
+*.swift text eol=lf
+patches/*.py text eol=lf

@@ -77,7 +77,7 @@ def prepare(source, run_integrations=True, compile_only=False):
             raise ValueError('Invalid integration arguments')
         scripts.append((script, [a.replace('{upstream}', str(source)) for a in args]))
     copies = []
-    for module in ('transport', 'access', 'features', 'family-core', 'family-ui'):
+    for module in ('transport', 'access', 'features', 'privacy', 'family-core', 'family-ui'):
         folder = ROOT / module
         if not folder.exists():
             continue

@@ -1,0 +1,28 @@
+{
+  "revision": "24638bc69bd083981b178dd1e7f921eebbf7fc46",
+  "original_sources": {
+    "submodules/TelegramCore/Sources/Network/Network.swift": "ed034f1d93279c860c514a63925b76b8c3b9df0aaa4e7141d65129d42adc27d6",
+    "submodules/TelegramCore/Sources/State/AccountViewTracker.swift": "edb5bffa6f515a91c518c3d27d5e4f0035849dbef54598e1be8ee9e966dff37e",
+    "submodules/TelegramCore/Sources/State/ManagedConsumePersonalMessagesActions.swift": "a0d181edb9cc62428f0715155faa6d413118f3a95c9649f1b604abd4a6d14b8f",
+    "submodules/TelegramCore/Sources/State/ManagedSynchronizeConsumeMessageContentsOperations.swift": "94b4af136beb6e85ef7ff0b7f49433790fd90878685a86688b8f62a2879816d4",
+    "submodules/TelegramCore/Sources/State/SynchronizePeerReadState.swift": "8da4f77092e65bef27a3ded043925731192186063ee53c75432bffdfac22be2e",
+    "submodules/TelegramCore/Sources/State/Sync/StateReplay+Messages.swift": "d0887ea6d265479b3ced2f5e46c1151bf21c55650b2738612bc86dbf675df217",
+    "submodules/TelegramCore/Sources/TelegramEngine/Messages/ApplyMaxReadIndexInteractively.swift": "237781ca2c9c1121d7b94ce6cfbd884b02fb2a56fc7926c494a4d356de31316c",
+    "submodules/TelegramCore/Sources/TelegramEngine/Messages/MarkAllChatsAsRead.swift": "e5550271c93b847c143fb79f7542c0ec38550b8e105f63f6fe80a73d27309c1e",
+    "submodules/TelegramCore/Sources/TelegramEngine/Messages/ReplyThreadHistory.swift": "1462f9c5455a8693eb30797621286dbbf7811c4a743e3454c041938eb6fbfe55",
+    "submodules/TelegramCore/Sources/State/ManagedSynchronizeMarkAllUnseenPersonalMessagesOperations.swift": "0a59d549b76af1ba080fc63da20e74c0bf5b2b8dc4cca7014b0072384494c360"
+  },
+  "sources_after_network_patch": {
+    "submodules/TelegramCore/Sources/Network/Network.swift": "f1c3c30549f9992286654e89a1c50c2c4eead34befcf70e8c455e5d96024fd96",
+    "submodules/TelegramCore/Sources/State/AccountViewTracker.swift": "edb5bffa6f515a91c518c3d27d5e4f0035849dbef54598e1be8ee9e966dff37e",
+    "submodules/TelegramCore/Sources/State/ManagedConsumePersonalMessagesActions.swift": "a0d181edb9cc62428f0715155faa6d413118f3a95c9649f1b604abd4a6d14b8f",
+    "submodules/TelegramCore/Sources/State/ManagedSynchronizeConsumeMessageContentsOperations.swift": "94b4af136beb6e85ef7ff0b7f49433790fd90878685a86688b8f62a2879816d4",
+    "submodules/TelegramCore/Sources/State/SynchronizePeerReadState.swift": "8da4f77092e65bef27a3ded043925731192186063ee53c75432bffdfac22be2e",
+    "submodules/TelegramCore/Sources/State/Sync/StateReplay+Messages.swift": "d0887ea6d265479b3ced2f5e46c1151bf21c55650b2738612bc86dbf675df217",
+    "submodules/TelegramCore/Sources/TelegramEngine/Messages/ApplyMaxReadIndexInteractively.swift": "237781ca2c9c1121d7b94ce6cfbd884b02fb2a56fc7926c494a4d356de31316c",
+    "submodules/TelegramCore/Sources/TelegramEngine/Messages/MarkAllChatsAsRead.swift": "e5550271c93b847c143fb79f7542c0ec38550b8e105f63f6fe80a73d27309c1e",
+    "submodules/TelegramCore/Sources/TelegramEngine/Messages/ReplyThreadHistory.swift": "1462f9c5455a8693eb30797621286dbbf7811c4a743e3454c041938eb6fbfe55",
+    "submodules/TelegramCore/BUILD": "aa8535839b1e6a338fa534f3f950ac6603e1024dbb2f428f03d1efad22974f9c",
+    "submodules/TelegramCore/Sources/State/ManagedSynchronizeMarkAllUnseenPersonalMessagesOperations.swift": "0a59d549b76af1ba080fc63da20e74c0bf5b2b8dc4cca7014b0072384494c360"
+  }
+}

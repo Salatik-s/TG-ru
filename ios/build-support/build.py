@@ -102,6 +102,9 @@ def build(number, compile_only=False):
         command.invoke_build()  # Full upstream Telegram/Telegram target, unchanged target selection.
         artifact = source / 'bazel-bin/Telegram/Telegram.ipa'
         report['ipa'] = verify(artifact)
+        report['ipa']['local_features'] = json.loads(capture(
+            sys.executable, str(ROOT / 'features/resourcesintegration.py'), '--verify-ipa', str(artifact)
+        ))
         target = dist / ('BASELINE-NOT-CONNECTED.ipa' if compile_only else 'TG-ru-unsigned.ipa')
         shutil.copyfile(artifact, target)
         report.update({'toolchain': {key: LOCK[key] for key in ('xcode_version', 'xcode_build', 'macos_major', 'bazel_version')},

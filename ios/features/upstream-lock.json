@@ -1,0 +1,16 @@
+{
+  "commit": "24638bc69bd083981b178dd1e7f921eebbf7fc46",
+  "files": {
+    "submodules/Media/LocalAudioTranscription/Sources/LocalAudioTranscription.swift": "93f8cf384b98959cf8f06fcaed48cc5204a39c266061b893d9998f50097efe04",
+    "submodules/Media/LocalAudioTranscription/BUILD": "70ca1fab0d1ada972bb15ae6f5ccb39e9371bcb131ab70784d6775a5564f5871",
+    "submodules/TelegramUI/Components/Chat/ChatMessageInteractiveFileNode/Sources/ChatMessageInteractiveFileNode.swift": "53758283d53aa03a59cf049cdc1fc3e8df3b932aa7228e9c205d22340065727d",
+    "submodules/TelegramUI/Components/Chat/ChatMessageInteractiveInstantVideoNode/Sources/ChatMessageInteractiveInstantVideoNode.swift": "720559f3d885653f3d5a88d298262d186ff9fac3208f27b5ff3ad3d85a3a9123",
+    "submodules/TelegramUI/Components/Chat/ChatMessageInteractiveInstantVideoNode/BUILD": "73847379b6483f2b59361228a37f694c31cfe4dcacb75a2714aa1c4b62c217f5",
+    "submodules/TelegramUI/Sources/DocumentPreviewController.swift": "00dd3eb9ab411d8d947c7de7002320c18730d1ced25c670fe82461fbf612acf1",
+    "submodules/TelegramUI/BUILD": "a1a0ba5f2f24e0252431a3a335c03b5277e5956268861ae767b7871ba52e55d7",
+    "submodules/TelegramUI/Components/Chat/ChatMessageTextBubbleContentNode/Sources/ChatMessageTextBubbleContentNode.swift": "d338d27af0b76a9aa7071c4ced2d651e5d52119ec7d15452875e7cc4dfa394d5",
+    "submodules/TelegramUI/Components/Chat/ChatMessageTextBubbleContentNode/BUILD": "40f180de7c0caf2f15e910af8c874d1a3c0d56ee6fcf1555ee26dee8cea3c427",
+    "submodules/ChatListUI/Sources/ChatListController.swift": "e225468a226f3ac29c0fcc12b258f881f68461ef1b1bdf8b1050966eb1e16c55",
+    "submodules/ChatListUI/BUILD": "073943fa13d302618dc39bc70590dc3217cfa3e613777a4e78d873a212145240"
+  }
+}
