@@ -13,7 +13,7 @@ import sys
 import urllib.request
 from common import ROOT, LOCK, credentials, digest, owned, write_json
 from configuration import emit
-from prepare import prepare
+from prepare import prepare, prepare_unsigned_rules
 from verify_ipa import verify
 
 def capture(*args):
@@ -63,6 +63,7 @@ def build(number, compile_only=False):
     if capture('git', '-C', str(rules), 'rev-parse', 'HEAD') != LOCK['rules_apple_commit']:
         raise ValueError('Rules Apple commit mismatch')
     report = prepare(source, compile_only=compile_only)
+    report['patches'].append(prepare_unsigned_rules(source))
     changed = capture('git', '-C', str(source), 'diff', '--name-only').splitlines()
     report['final_modified_sources'] = [{'path': relative, 'sha256': digest(source / relative)} for relative in changed]
     bazel = download_bazel(source)

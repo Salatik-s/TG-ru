@@ -8,6 +8,30 @@ import subprocess
 import sys
 from common import ROOT, LOCK, contained, digest, verify_sources
 
+def prepare_unsigned_rules(source):
+    relative = 'build-system/bazel-rules/rules_apple/apple/internal/ios_rules.bzl'
+    target = contained(source, relative)
+    before = target.read_bytes()
+    original_hash = hashlib.sha256(before).hexdigest()
+    if original_hash != 'b6776b1c10a2c965f01259dd95ebe1b045afc5e22b3446b8ae81d44f11c3a7da':
+        raise ValueError('Rules Apple iOS application source hash mismatch')
+    text = before.decode('utf-8')
+    start = text.index('def _ios_application_impl(')
+    end = text.index('\ndef ', start + 4)
+    application = text[start:end]
+    anchor = ('    if platform_prerequisites.platform.is_device:\n'
+              '        processor_partials.append(\n'
+              '            partials.provisioning_profile_partial(')
+    if application.count(anchor) != 1:
+        raise ValueError('Rules Apple application profile anchor changed')
+    # With explicit unsigned packaging, omit the profile embedding step when no profile exists.
+    # Signed builds and other Apple rules retain upstream profile validation.
+    unsigned = anchor.replace('is_device:', 'is_device and (provisioning_profile or "disable_legacy_signing" not in features):')
+    after = (text[:start] + application.replace(anchor, unsigned, 1) + text[end:]).encode('utf-8')
+    target.write_bytes(after)
+    return {'path': relative, 'before_sha256': original_hash,
+            'after_sha256': hashlib.sha256(after).hexdigest(), 'purpose': 'Unsigned application packaging'}
+
 def patch_build(source, compile_only=False):
     needle = '    name = "TelegramEntitlements",'
     start = source.index(needle)
