@@ -5,7 +5,7 @@ from pathlib import Path
 import re
 
 MANAGER = "submodules/TelegramCallsUI/Sources/PresentationCallManager.swift"
-PIN = "648e88733c2c5721c1fced9b49e27cd6e2f64d09dfd88fc2af3b59e354b543a1"
+PIN = "7f8efff863345038e162cd5dbdcb70e7b7fbdf654ee2d568c06703e732c35c7e"
 
 
 def patch(raw):

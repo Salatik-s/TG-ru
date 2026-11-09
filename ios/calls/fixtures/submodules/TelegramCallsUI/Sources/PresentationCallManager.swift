@@ -1225,4 +1225,3 @@ public final class PresentationCallManagerImpl: PresentationCallManager {
         return .joined
     }
 }
-
