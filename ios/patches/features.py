@@ -49,7 +49,7 @@ def transformed(snapshot=FEATURES / 'upstream'):
         if path == ROUND:
             source = replace_one(source, 'import Foundation\n', 'import Foundation\nimport LocalAudioTranscription\n')
             source = region(source, '                    var displayTranscribe = false\n', '                    if displayTranscribe, let transcribeButtonBlurColor {',
-                '                    let displayTranscribe = familyLocalSpeechEnabled && item.message.id.peerId.namespace != Namespaces.Peer.SecretChat && statusDisplayType == .free && !isViewOnceMessage && !item.presentationData.isPreview\n\n')
+                '                    var displayTranscribe = familyLocalSpeechEnabled && item.message.id.peerId.namespace != Namespaces.Peer.SecretChat && statusDisplayType == .free && !isViewOnceMessage && !item.presentationData.isPreview\n\n')
             block = '''            let currentTime = Int32(Date().timeIntervalSince1970)
             if transcribedText == nil, let cooldownUntilTime = item.associatedData.audioTranscriptionTrial.cooldownUntilTime, cooldownUntilTime > currentTime {
                 updatedAudioTranscriptionState = .locked
