@@ -6,6 +6,9 @@ import re
 
 ROOT = Path(__file__).resolve().parent.parent
 LOCK = json.loads((ROOT / 'upstream-lock.json').read_text(encoding='utf-8'))
+# Public, restricted test pair documented by Telegram Desktop.
+# https://github.com/telegramdesktop/tdesktop/blob/dev/docs/api_credentials.md
+TEST_API = ('17349', '344583e45741c457fe1862106095a5eb')
 
 def digest(path):
     value = hashlib.sha256()
@@ -18,9 +21,13 @@ def owned():
     if (ROOT / '.tg-ru-ios-owned').read_text().strip() != 'tg-ru-ios-v1':
         raise ValueError('Workspace ownership marker mismatch')
 
-def credentials(environment=None, compile_only=False):
+def credentials(environment=None, compile_only=False, test_login=False):
+    if compile_only and test_login:
+        raise ValueError('Choose one test build mode')
     if compile_only:
         return '2147483647', '0' * 32
+    if test_login:
+        return TEST_API
     environment = os.environ if environment is None else environment
     api_id, api_hash = environment.get('TG_API_ID', ''), environment.get('TG_API_HASH', '')
     if not re.fullmatch(r'[1-9][0-9]{0,9}', api_id) or int(api_id) > 2147483647:
@@ -29,6 +36,8 @@ def credentials(environment=None, compile_only=False):
         raise ValueError('Own TG_API_HASH is missing or invalid')
     if api_hash == '0' * 32 or api_id == '2147483647':
         raise ValueError('Compile-only dummy API values are not accepted for own-api builds')
+    if api_id == TEST_API[0]:
+        raise ValueError('The public sample API ID is limited to test-login builds')
     return api_id, api_hash
 
 def contained(base, relative):

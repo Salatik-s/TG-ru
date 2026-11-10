@@ -19,8 +19,9 @@ from verify_ipa import verify
 def capture(*args):
     return subprocess.check_output(args, text=True).strip()
 
-def preflight(compile_only=False):
-    owned(); credentials(compile_only=compile_only)
+def preflight(compile_only=False, test_login=False):
+    owned()
+    credentials(compile_only=compile_only, test_login=test_login)
     if platform.system() != 'Darwin' or platform.machine() != 'arm64':
         raise ValueError('Build requires an Apple Silicon macOS runner')
     if capture('sw_vers', '-productVersion').split('.')[0] != LOCK['macos_major']:
@@ -28,7 +29,8 @@ def preflight(compile_only=False):
     xcode = capture('xcodebuild', '-version')
     expected = 'Xcode ' + LOCK['xcode_version'] + '\nBuild version ' + LOCK['xcode_build']
     if xcode != expected: raise ValueError('Pinned Xcode version/build is unavailable')
-    print('PREFLIGHT_OK: exact Apple toolchain; ' + ('COMPILE_ONLY dummy configuration' if compile_only else 'own API credentials present (not printed)'))
+    mode = 'compile-only' if compile_only else 'test-login' if test_login else 'own-api'
+    print('PREFLIGHT_OK: exact Apple toolchain; ' + mode)
 
 def download_bazel(source):
     name = 'bazel-' + LOCK['bazel_version'] + '-darwin-arm64'
@@ -48,8 +50,8 @@ def download_bazel(source):
         raise ValueError('Bazel version mismatch')
     return path
 
-def build(number, compile_only=False):
-    preflight(compile_only)
+def build(number, compile_only=False, test_login=False):
+    preflight(compile_only, test_login)
     source = ROOT / 'upstream'
     if not source.is_dir() or source.is_symlink(): raise ValueError('Pinned upstream checkout required')
     if capture('git', '-C', str(source), 'rev-parse', 'HEAD') != LOCK['commit']:
@@ -69,8 +71,8 @@ def build(number, compile_only=False):
     changed = capture('git', '-C', str(source), 'diff', '--ignore-submodules=dirty', '--name-only').splitlines()
     report['final_modified_sources'] = [{'path': relative, 'sha256': digest(source / relative)} for relative in changed]
     bazel = download_bazel(source)
-    configuration = emit(source, bazel, compile_only=compile_only)
-    api_id, api_hash = credentials(compile_only=compile_only)
+    configuration = emit(source, bazel, compile_only=compile_only, test_login=test_login)
+    api_id, api_hash = credentials(compile_only=compile_only, test_login=test_login)
     api_pattern = re.compile(r'(?<![0-9])' + re.escape(api_id) + r'(?![0-9])')
     def redacted(value):
         return api_pattern.sub('[API_ID]', value.replace(api_hash, '[API_HASH]'))
@@ -109,11 +111,14 @@ def build(number, compile_only=False):
         report['ipa']['local_features'] = json.loads(capture(
             sys.executable, str(ROOT / 'features/resourcesintegration.py'), '--verify-ipa', str(artifact)
         ))
-        target = dist / ('BASELINE-NOT-CONNECTED.ipa' if compile_only else 'TG-ru-unsigned.ipa')
+        output_name = ('BASELINE-NOT-CONNECTED.ipa' if compile_only else
+                       'TG-ru-TEST-LOGIN-unsigned.ipa' if test_login else 'TG-ru-unsigned.ipa')
+        target = dist / output_name
         shutil.copyfile(artifact, target)
         report.update({'toolchain': {key: LOCK[key] for key in ('xcode_version', 'xcode_build', 'macos_major', 'bazel_version')},
                        'submodules': submodules.splitlines(), 'ipa_sha256': digest(target),
-                       'build_kind': 'unsigned-native-baseline', 'compile_only': compile_only, 'production_ready': False})
+                       'build_kind': 'unsigned-native-baseline', 'compile_only': compile_only,
+                       'public_test_api': test_login, 'production_ready': False})
         write_json(dist / 'build-manifest.json', report)
         (dist / 'SHA256SUMS.txt').write_text(digest(target) + '  ' + target.name + '\n')
         print('UNSIGNED_IPA_VALIDATED: local signing and device tests still required')
@@ -124,13 +129,15 @@ def build(number, compile_only=False):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--preflight', action='store_true')
-    parser.add_argument('--compile-only', action='store_true')
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument('--compile-only', action='store_true')
+    modes.add_argument('--test-login', action='store_true')
     parser.add_argument('--build-number', type=int, default=1)
     args = parser.parse_args()
     if not 1 <= args.build_number <= 2147483647: raise SystemExit('Invalid build number')
     try:
-        if args.preflight: preflight(args.compile_only)
-        else: build(args.build_number, args.compile_only)
+        if args.preflight: preflight(args.compile_only, args.test_login)
+        else: build(args.build_number, args.compile_only, args.test_login)
     except Exception as error:
         # Exceptions from subprocesses/config parsing must not print credentials.
         print('BUILD_FAILED: ' + type(error).__name__, file=sys.stderr)

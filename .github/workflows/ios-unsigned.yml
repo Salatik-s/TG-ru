@@ -3,9 +3,9 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: Compile-only baseline or own API credentials
+        description: Compile-only baseline, private login test, or own API credentials
         type: choice
-        options: [unit-only, compile-only, own-api]
+        options: [unit-only, compile-only, test-login, own-api]
         default: unit-only
 permissions:
   contents: read
@@ -51,6 +51,7 @@ jobs:
         run: |
           args=()
           if [ "${{ inputs.mode }}" = "compile-only" ]; then args+=(--compile-only); fi
+          if [ "${{ inputs.mode }}" = "test-login" ]; then args+=(--test-login); fi
           python3 build-support/build.py --preflight "${args[@]}"
       - name: Fetch pinned native application and its submodules
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -68,6 +69,7 @@ jobs:
         run: |
           args=()
           if [ "${{ inputs.mode }}" = "compile-only" ]; then args+=(--compile-only); fi
+          if [ "${{ inputs.mode }}" = "test-login" ]; then args+=(--test-login); fi
           python3 build-support/build.py --build-number "${GITHUB_RUN_NUMBER}" "${args[@]}"
       - name: Upload validated unsigned archive
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

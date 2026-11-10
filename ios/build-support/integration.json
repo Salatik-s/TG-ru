@@ -28,7 +28,7 @@
     },
     {
       "path": "patches/access.py",
-      "sha256": "7f35adc6f3c1e52a1260c7cfac164e2d37ccf6b9aef495daf2e88f99aa1c258a",
+      "sha256": "a183b1b93c547478eb37bf61ee4f84c4a80f263ee2f75b174ce0bd270cea6eb7",
       "args": [
         "--source",
         "{upstream}"

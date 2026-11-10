@@ -7,7 +7,7 @@ import struct
 import tempfile
 import unittest
 import zipfile
-from common import ROOT, LOCK, contained, credentials, digest, verify_sources
+from common import ROOT, LOCK, TEST_API, contained, credentials, digest, verify_sources
 from configuration import emit
 from prepare import patch_build, patch_personal_delegate, patch_personal_passcode, prepare
 from verify_ipa import verify, macho
@@ -33,6 +33,8 @@ class BuildTests(unittest.TestCase):
     def test_personal_team_storage_and_passcode(self):
         source = (FIXTURE / 'submodules/TelegramUI/Sources/AppDelegate.swift').read_text(encoding='utf-8')
         changed = patch_personal_delegate(source)
+        background_method = changed.split('private func urlSession(identifier:', 1)[1].split('private var pendingUrlSessionBackgroundEventsCompletion', 1)[0]
+        self.assertNotIn('let appGroupName', background_method)
         self.assertIn('configuration.sharedContainerIdentifier = nil', changed)
         self.assertIn('FileProtectionType.completeUntilFirstUserAuthentication', changed)
         self.assertNotIn('containerURL(forSecurityApplicationGroupIdentifier:', changed)
@@ -75,6 +77,11 @@ class BuildTests(unittest.TestCase):
         dummy = credentials({}, compile_only=True)
         self.assertEqual(dummy, ('2147483647', '0' * 32))
         with self.assertRaises(ValueError): credentials(dict(zip(('TG_API_ID', 'TG_API_HASH'), dummy)))
+        self.assertEqual(credentials(SYNTHETIC_ENV, test_login=True), TEST_API)
+        with self.assertRaises(ValueError):
+            credentials(dict(zip(('TG_API_ID', 'TG_API_HASH'), TEST_API)))
+        with self.assertRaises(ValueError):
+            credentials(compile_only=True, test_login=True)
 
     def test_configuration(self):
         with tempfile.TemporaryDirectory() as temp:

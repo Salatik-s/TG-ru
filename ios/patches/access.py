@@ -5,7 +5,7 @@ from pathlib import Path
 
 APP = 'submodules/TelegramUI/Sources/AppDelegate.swift'
 BUILD = 'submodules/TelegramUI/BUILD'
-APP_PIN = '559513b5c63f9197c3be57de453ffc7780dc45de9422b085e430079e4fe39a00'
+APP_PIN = 'ebccd1fe2d7cf57b7118249bb29049900f0f86659341f841ac4812b691e01c3c'
 BUILD_PIN = 'a1a0ba5f2f24e0252431a3a335c03b5277e5956268861ae767b7871ba52e55d7'
 
 

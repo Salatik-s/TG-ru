@@ -9,6 +9,11 @@ uses explicit invalid dummy API values and produces BASELINE-NOT-CONNECTED.ipa, 
 connected client. The own-api mode requires your own TG_API_ID and TG_API_HASH repository
 secrets; missing, dummy or malformed credentials stop before upstream checkout.
 
+The manual test-login mode uses Telegram's public, server-limited sample pair and
+produces TG-ru-TEST-LOGIN-unsigned.ipa for a private login attempt. It enables the
+existing access gate and host transport, reads no own-api secrets, and is not a
+release for the downloads site.
+
 ## Baseline build
 
 Run build-support/build.py on an Apple Silicon Mac with Xcode 27.1 build 27A9275 and macOS 27.

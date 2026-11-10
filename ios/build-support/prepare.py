@@ -48,11 +48,16 @@ def patch_build(source, compile_only=False):
     return result.replace(name, '    <key>CFBundleDisplayName</key>\n    <string>' + display + '</string>')
 
 def patch_personal_delegate(source):
-    background = '        configuration.sharedContainerIdentifier = appGroupName'
+    background = '''        let baseAppBundleId = Bundle.main.bundleIdentifier!
+        let appGroupName = "group.\\(baseAppBundleId)"
+
+        let configuration = URLSessionConfiguration.background(withIdentifier: identifier)
+        configuration.sharedContainerIdentifier = appGroupName'''
     container = '        let maybeAppGroupUrl = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupName)'
     if source.count(background) != 1 or source.count(container) != 1:
         raise ValueError('Personal Team AppDelegate source pin mismatch')
-    source = source.replace(background, '        configuration.sharedContainerIdentifier = nil // Personal Team: no App Group entitlement.')
+    source = source.replace(background, '''        let configuration = URLSessionConfiguration.background(withIdentifier: identifier)
+        configuration.sharedContainerIdentifier = nil // Personal Team: no App Group entitlement.''')
     return source.replace(container, '''        // Personal Team: all account data belongs to this application's private container.
         let maybeAppGroupUrl: URL? = {
             guard let url = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?.appendingPathComponent("TG-ru", isDirectory: true) else {

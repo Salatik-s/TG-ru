@@ -2,8 +2,8 @@
 import os
 from common import credentials
 
-def emit(source, bazel, environment=None, compile_only=False):
-    api_id, api_hash = credentials(environment, compile_only)
+def emit(source, bazel, environment=None, compile_only=False, test_login=False):
+    api_id, api_hash = credentials(environment, compile_only=compile_only, test_login=test_login)
     folder = source / 'build-input/configuration-repository'
     folder.mkdir(parents=True, exist_ok=True)
     os.chmod(folder, 0o700)
