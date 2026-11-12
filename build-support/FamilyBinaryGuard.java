@@ -41,7 +41,7 @@ public final class FamilyBinaryGuard implements Application.ActivityLifecycleCal
         Activity activity = instance == null ? null : instance.foreground.get();
         if (activity == null || !activity.getClass().getName().equals(LAUNCHER) || activity.isFinishing()) return;
         try {
-            FamilyFeatures.refreshVisibilityTitle();
+            FamilyFeatures.refreshChatTitle();
             activity.getClass().getMethod("updateCurrentConnectionState", int.class).invoke(activity, 0);
         } catch (ReflectiveOperationException | RuntimeException ignored) { }
     }
@@ -64,7 +64,6 @@ public final class FamilyBinaryGuard implements Application.ActivityLifecycleCal
         if (!canShow(activity)) redirect(activity);
         else if (activity.getClass().getName().equals(LAUNCHER)) {
             FamilyAccess.resumeConnection();
-            FamilyFeatures.ensureDefaults(activity);
             activity.getWindow().getDecorView().post(() -> {
                 if (foreground.get() != activity) return;
                 refreshConnectionHeader();

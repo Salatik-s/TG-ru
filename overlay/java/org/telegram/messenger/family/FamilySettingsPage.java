@@ -1,6 +1,5 @@
 package org.telegram.messenger.family;
 
-import android.os.Bundle;
 import android.os.Build;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
@@ -17,9 +16,6 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.Switch;
 import android.widget.TextView;
-import android.widget.Toast;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import org.telegram.messenger.R;
 
 /** Shared Telegram-themed settings rows, insets, typography and accessibility. */
@@ -130,10 +126,6 @@ abstract class FamilySettingsPage extends FamilyUi {
             title.setText(titleResource); title.setTextColor(ink); title.setTextSize(16);
             title.setGravity(Gravity.START); title.setIncludeFontPadding(false);
             String summary = getString(summaryResource);
-            if (summaryResource == R.string.fg_ghost_master_summary) {
-                int sentence = summary.indexOf('.');
-                if (sentence >= 0) summary = summary.substring(0, sentence + 1);
-            }
             TextView detail = new TextView(FamilySettingsPage.this);
             detail.setText(summary); detail.setTextColor(muted); detail.setTextSize(13);
             detail.setGravity(Gravity.START); detail.setIncludeFontPadding(false);

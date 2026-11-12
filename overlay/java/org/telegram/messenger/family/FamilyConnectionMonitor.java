@@ -82,6 +82,7 @@ public final class FamilyConnectionMonitor {
         boolean online = hasNetwork();
         boolean gainedNetwork = online && !networkWasAvailable;
         networkWasAvailable = online;
+        FamilyAccess.reportTransportState(telegramState);
         String kind = networkKind();
         if (!kind.equals(lastNetwork)) {
             lastNetwork = kind;
@@ -138,13 +139,20 @@ public final class FamilyConnectionMonitor {
     static String report() { return log.getString("events", ""); }
 
     private static void record(String event) {
-        if (logging()) IO.execute(() -> append(event));
+        if (logging()) {
+            long observedAt = System.currentTimeMillis();
+            IO.execute(() -> append(event, observedAt));
+        }
     }
 
     private static void append(String event) {
+        append(event, System.currentTimeMillis());
+    }
+
+    private static void append(String event, long observedAt) {
         if (!logging()) return;
         String existing = log.getString("events", "");
-        String line = System.currentTimeMillis() + " " + event + "\n";
+        String line = observedAt + " " + event + "\n";
         String events = existing + line;
         if (events.length() > MAX_LOG_CHARS) {
             events = events.substring(events.indexOf('\n', events.length() - MAX_LOG_CHARS) + 1);

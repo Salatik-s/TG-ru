@@ -10,22 +10,6 @@ public final class FamilyFeatures {
     private static java.lang.ref.WeakReference<Object> chats = new java.lang.ref.WeakReference<>(null);
 
     private FamilyFeatures() { }
-    public static boolean saveDeletedEnabled() {
-        try {Object item=historyItem();return (Boolean)item.getClass().getMethod("Bool").invoke(item);}catch(Exception failure){return false;}
-    }
-    public static boolean setSaveDeleted(boolean enabled) {
-        try {Object item=historyItem();item.getClass().getMethod("setConfigBool",boolean.class).invoke(item,enabled);return true;}catch(Exception failure){return false;}
-    }
-    private static Object historyItem() throws Exception {
-        Class<?> config=Class.forName("xyz.nextalone.nagram.NaConfig");
-        return config.getMethod("getEnableSaveDeletedMessages").invoke(config.getField("INSTANCE").get(null));
-    }
-    public static void ensureDefaults(android.content.Context context) {
-        android.content.SharedPreferences preferences=context.getSharedPreferences("familygram_features_v2",0);
-        if(!preferences.getBoolean("deleted_history_initialized",false)&&setSaveDeleted(true))
-            preferences.edit().putBoolean("deleted_history_initialized",true).apply();
-    }
-
     static boolean isMainChatList(Object fragment) {
         try {
             Class<?> type = fragment.getClass();
@@ -62,7 +46,7 @@ public final class FamilyFeatures {
         } catch (ReflectiveOperationException ignored) { }
     }
 
-    public static void refreshVisibilityTitle() {
+    public static void refreshChatTitle() {
         Object fragment = chats.get();
         if (fragment == null) return;
         try { fragment.getClass().getMethod("updateTitleText").invoke(fragment); }
@@ -84,18 +68,10 @@ public final class FamilyFeatures {
         }
         intent.removeExtra("family_screen");
         if("plugins".equals(screen)){activity.startActivity(new Intent(activity,FamilyPluginsActivity.class));return true;}
-        if("ghost".equals(screen)){activity.startActivity(new Intent(activity,FamilyPrivacyActivity.class));return true;}
-        String target;
-        if ("history".equals(screen)) {
-            target = "tw.nekomimi.nekogram.settings.NekoExperimentalSettingsActivity";
-        } else if ("external_plugins".equals(screen)) {
-            target = "app.exteraless.plugins.ui.PluginsActivity";
-        } else {
-            return true;
-        }
+        if (!"external_plugins".equals(screen)) return true;
         try {
             Class<?> base = Class.forName("org.telegram.ui.ActionBar.BaseFragment");
-            Object fragment = Class.forName(target).getConstructor().newInstance();
+            Object fragment = Class.forName("app.exteraless.plugins.ui.PluginsActivity").getConstructor().newInstance();
             if (!base.isInstance(fragment)) throw new IllegalStateException();
             activity.getClass().getMethod("presentFragment", base).invoke(activity, fragment);
         } catch (ReflectiveOperationException | RuntimeException failure) {

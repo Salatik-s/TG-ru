@@ -9,7 +9,7 @@ import org.telegram.messenger.R;
 
 /** Keep ordinary Telegram settings intact; optional technical settings are last. */
 public final class FamilyBinarySettings {
-    public static final int ROW_ID = -44001, PRIVACY_ID = -44002, PLUGINS_ID = -44003, DEVICES_ID = -44004;
+    public static final int ROW_ID = -44001, PLUGINS_ID = -44003, DEVICES_ID = -44004;
     private static final int CONTACT_ID = -44005, CONTACT_EDIT_ID = -44006;
     private static final int BACKGROUND_ID = -44007, UPDATE_ID = -44008, HEADER_ID = -44009;
     private static final int CONNECTION_ID = -44010;
@@ -19,7 +19,7 @@ public final class FamilyBinarySettings {
     public static void addRow(Object fragment, ArrayList<Object> items) {
         try {
             Activity activity = (Activity)fragment.getClass().getMethod("getParentActivity").invoke(fragment);
-            if (activity == null) throw new IllegalStateException("Settings fragment has no Activity");
+            if (activity == null || activity.isFinishing() || activity.isDestroyed()) return;
             java.lang.reflect.Field search = fragment.getClass().getDeclaredField("searchItem"); search.setAccessible(true);
             Object searchItem = search.get(fragment);
             if (searchItem != null && (Boolean)searchItem.getClass().getMethod("isSearchFieldVisible2").invoke(searchItem)) return;
@@ -37,7 +37,6 @@ public final class FamilyBinarySettings {
             items.add(position++, row(activity, CONNECTION_ID, "msg_proxy", R.string.fg_connection, R.string.fg_route_settings_summary));
             items.add(position++, row(activity, HEADER_ID, "msg_theme", "Заголовок чатов",
                     "Выбрать текст в шапке"));
-            items.add(position++, row(activity, PRIVACY_ID, "ayu_ghost", R.string.fg_ghost_settings_title, R.string.fg_privacy_summary));
             items.add(position++, row(activity, PLUGINS_ID, "msg_plugins", R.string.fg_plugins, R.string.fg_plugins_simple_summary));
             items.add(position++, row(activity, CONTACT_ID, "msg_discussion", "Связаться с разработчиком",
                     "@" + FamilyDeveloperContact.username(activity)));
@@ -99,7 +98,6 @@ public final class FamilyBinarySettings {
             int id = item.getClass().getField("id").getInt(item);
             Class<?> destination;
             if (id == ROW_ID || id == CONNECTION_ID) destination = FamilySettingsActivity.class;
-            else if (id == PRIVACY_ID) destination = FamilyPrivacyActivity.class;
             else if (id == PLUGINS_ID) destination = FamilyPluginsActivity.class;
             else if (id == DEVICES_ID) destination = FamilyDevicesActivity.class;
             else if (id == CONTACT_ID || id == CONTACT_EDIT_ID || id == BACKGROUND_ID || id == UPDATE_ID || id == HEADER_ID) destination = null;
