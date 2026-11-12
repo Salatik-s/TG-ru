@@ -167,18 +167,18 @@ nav a[aria-current="page"] { color: var(--text); font-weight: 600; }
   border-color: var(--plan-accent);
   background: linear-gradient(180deg, color-mix(in srgb, var(--plan-accent) 13%, var(--surface)), var(--surface) 60%);
 }
-.plan-amount { min-block-size: 62px; }
-.plan-previous { font-size: .875rem; }
+.plan-amount { min-inline-size: 0; }
+.plan-previous { color: var(--muted); font-size: .9375rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.plan-term { margin-block-start: 4px; color: var(--muted); font-size: .9375rem; }
 .plan-saving { margin-block-start: 8px; color: var(--plan-accent); font-size: .8125rem; font-weight: 600; }
 .price-panel > .button { margin-block-start: auto; min-block-size: 52px; }
 .subscription-card { background: linear-gradient(180deg, var(--tint), var(--surface) 80%); }
 .dashboard-card.subscription-card { border-color: color-mix(in srgb, var(--accent) 66%, var(--border)); }
-.plan-points { display: grid; gap: 12px; list-style: none; margin: 0; padding: 0; font-size: .9375rem; }
+.plan-points { display: grid; align-content: start; gap: 12px; list-style: none; margin: 0; padding: 0; font-size: .9375rem; }
 .plan-points li { display: flex; align-items: flex-start; gap: 10px; }
 .plan-points svg { inline-size: 16px; block-size: 16px; margin-block-start: 3px; }
-.price { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; color: var(--text); }
-.price strong { font-size: clamp(2.15rem, 1.2rem + 2.6vw, 3rem); letter-spacing: -.026em; line-height: 1.24; font-variant-numeric: tabular-nums; }
-.price > span { color: var(--muted); }
+.price { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; color: var(--text); }
+.price strong { font-size: clamp(2.15rem, 1.2rem + 2.6vw, 3rem); letter-spacing: -.026em; line-height: 1.16; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .plan-custom { margin-block-start: 16px; }
 .plan-custom h3 { color: var(--warning); }
 .plan-custom strong { display: block; margin-block: 6px; font-size: clamp(1.5rem, 2.3vw, 2rem); letter-spacing: -.02em; }
@@ -329,6 +329,9 @@ main:has(.checkout-page) { flex: 0; }
   .session-links .button { padding-inline: 16px; }
   .route-figure { padding: 24px; }
   .price-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  @supports (grid-template-rows: subgrid) {
+    .price-grid > .price-panel { display: grid; grid-template-rows: subgrid; grid-row: span 4; }
+  }
   .visibility-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .device-list li { grid-template-columns: 48px minmax(0, 1fr) minmax(0, 1fr); }
   .device-list .revoke { grid-column: auto; }

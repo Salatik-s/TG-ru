@@ -131,7 +131,7 @@ function pricing(session, accountPath) {
     { name: 'START', price: '199 ₽', term: 'в месяц', points: [gateway, ...tools, 'До 3 устройств', 'Без автоматического списания'],
       button: session.account ? action('/checkout', 'Получить доступ', 'primary') : action('/register', 'Создать аккаунт', 'primary') },
     { name: 'PRO', price: '500 ₽', term: 'за 3 месяца', highlight: 'gateway', badge: 'Выгодно: −16%',
-      previous: '597 ₽ при оплате START три раза', saving: '167 ₽ в месяц вместо 199 ₽ · экономия 97 ₽',
+      previous: '597 ₽', saving: '167 ₽ в месяц · экономия 97 ₽',
       points: ['Всё то же, что и в START', 'До 4 устройств', 'Оплата за 90 дней'],
       button: action('/checkout?plan=pro', 'Выбрать PRO', 'primary') },
   ];
@@ -149,8 +149,8 @@ function pricing(session, accountPath) {
       ${badge ? `<span class="plan-badge">${badge}</span>` : ''}
       <h4>${name}</h4>
       <div class="plan-amount">
-        ${previous ? `<p class="plan-previous"><s>${previous}</s></p>` : ''}
-        <p class="price"><strong>${price}</strong> <span>${term}</span></p>
+        <p class="price"><strong>${price}</strong>${previous ? ` <s class="plan-previous" title="Три месяца на START">${previous}</s>` : ''}</p>
+        <p class="plan-term">${term}</p>
         ${saving ? `<p class="plan-saving">${saving}</p>` : ''}
       </div>
       <ul class="plan-points">${points.map(point => `<li>${icon('check')}<span>${point}</span></li>`).join('')}</ul>
