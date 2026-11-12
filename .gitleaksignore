@@ -1,0 +1,23 @@
+# Reviewed SHA-256 checksums in historical source and deployment manifests.
+# Use exact fingerprints. See docs/WORKLOG.md for the review.
+75d90e8abff43fad8009f6bab3941b6dcbeded46:build-support/owner-original-hashes.json:generic-api-key:2
+75d90e8abff43fad8009f6bab3941b6dcbeded46:deploy/egress-repair.json:generic-api-key:1
+75d90e8abff43fad8009f6bab3941b6dcbeded46:deploy/egress-repair.json:jfrog-identity-token:1
+75d90e8abff43fad8009f6bab3941b6dcbeded46:deploy/outside-diagnostics.mjs:jfrog-identity-token:10
+75d90e8abff43fad8009f6bab3941b6dcbeded46:deploy/retry-staged.json:generic-api-key:1
+75d90e8abff43fad8009f6bab3941b6dcbeded46:deploy/retry-staged.json:jfrog-identity-token:1
+75d90e8abff43fad8009f6bab3941b6dcbeded46:deploy/transport-repair.json:generic-api-key:1
+75d90e8abff43fad8009f6bab3941b6dcbeded46:deploy/transport-repair.json:jfrog-identity-token:1
+75d90e8abff43fad8009f6bab3941b6dcbeded46:docs/SOURCE-SNAPSHOT.json:generic-api-key:115
+75d90e8abff43fad8009f6bab3941b6dcbeded46:docs/SOURCE-SNAPSHOT.json:generic-api-key:116
+75d90e8abff43fad8009f6bab3941b6dcbeded46:docs/SOURCE-SNAPSHOT.json:generic-api-key:148
+75d90e8abff43fad8009f6bab3941b6dcbeded46:docs/SOURCE-SNAPSHOT.json:generic-api-key:149
+75d90e8abff43fad8009f6bab3941b6dcbeded46:docs/SOURCE-SNAPSHOT.json:generic-api-key:165
+75d90e8abff43fad8009f6bab3941b6dcbeded46:docs/SOURCE-SNAPSHOT.json:generic-api-key:263
+75d90e8abff43fad8009f6bab3941b6dcbeded46:docs/SOURCE-SNAPSHOT.json:generic-api-key:276
+75d90e8abff43fad8009f6bab3941b6dcbeded46:docs/SOURCE-SNAPSHOT.json:generic-api-key:284
+75d90e8abff43fad8009f6bab3941b6dcbeded46:docs/SOURCE-SNAPSHOT.json:jfrog-identity-token:260
+75d90e8abff43fad8009f6bab3941b6dcbeded46:docs/SOURCE-SNAPSHOT.json:jfrog-identity-token:262
+94ca22857144197d9049ec0d8d7290ee30607459:docs/SOURCE-SNAPSHOT.json:generic-api-key:180
+94ca22857144197d9049ec0d8d7290ee30607459:docs/SOURCE-SNAPSHOT.json:generic-api-key:322
+94ca22857144197d9049ec0d8d7290ee30607459:qa/unreleased/server-transcription/manifest.json:generic-api-key:2
