@@ -1,6 +1,5 @@
 package org.telegram.messenger.family;
 
-import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
@@ -29,8 +28,6 @@ public final class FamilySettingsActivity extends FamilyUi implements FamilyAcce
         feedback = text(R.string.fg_network_error, 14, error);
         feedback.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
         add(feedback, 12);
-        navigationRow(R.string.fg_advanced_title, R.string.fg_advanced_summary, v -> openScreen("advanced"));
-        navigationRow(R.string.fg_advanced_neko, R.string.fg_advanced_summary, v -> openScreen("advanced_neko"));
         TextView device = section(R.string.fg_device_name, R.string.fg_device_name);
         device.setText(FamilyAccess.deviceName());
         fingerprint = section(R.string.fg_device_fingerprint, R.string.fg_fingerprint_pending);
@@ -49,16 +46,33 @@ public final class FamilySettingsActivity extends FamilyUi implements FamilyAcce
             address.setVisibility(showing ? View.VISIBLE : View.GONE);
             details.setText(showing ? R.string.fg_hide_details : R.string.fg_connection_details);
         });
+        diagnostics();
         if (!FamilyAccess.state().busy) FamilyAccess.refresh();
     }
-    private void openScreen(String destination) {
-        if (!FamilyAccess.isAllowed()) return;
-        Intent intent = new Intent();
-        intent.setClassName(getPackageName(), "org.telegram.ui.LaunchActivity");
-        intent.putExtra("family_screen", destination);
-        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        startActivity(intent);
-        finish();
+    private void diagnostics() {
+        TextView info = text(R.string.fg_connection_details, 14, muted);
+        info.setText("Журнал за 24 часа. Сохраняет время, состояние сети, сайта, сервера и счётчики звонков на телефоне.");
+        add(info, 20);
+        Button record = button(R.string.fg_connection_details, false);
+        record.setText(FamilyConnectionMonitor.logging() ? "Остановить запись" : "Записать диагностику");
+        record.setOnClickListener(v -> {
+            boolean recording = FamilyConnectionMonitor.logging();
+            if (recording) FamilyConnectionMonitor.stopLogging();
+            else FamilyConnectionMonitor.startLogging();
+            record.setText(recording ? "Записать диагностику" : "Остановить запись");
+        });
+        Button copy = button(R.string.fg_connection_details, false);
+        copy.setText("Скопировать журнал");
+        copy.setOnClickListener(v -> {
+            String report = FamilyConnectionMonitor.report();
+            if (report.isEmpty()) {
+                android.widget.Toast.makeText(this, "Журнал пока пуст", android.widget.Toast.LENGTH_SHORT).show();
+                return;
+            }
+            android.content.ClipboardManager clipboard = getSystemService(android.content.ClipboardManager.class);
+            clipboard.setPrimaryClip(android.content.ClipData.newPlainText("TG-ru", report));
+            android.widget.Toast.makeText(this, "Журнал скопирован", android.widget.Toast.LENGTH_SHORT).show();
+        });
     }
     @Override protected void onStart() { super.onStart(); FamilyAccess.addListener(this); }
     @Override protected void onStop() { FamilyAccess.removeListener(this); super.onStop(); }

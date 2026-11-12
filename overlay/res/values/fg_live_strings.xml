@@ -2,9 +2,9 @@
 <resources>
     <string name="fg_live_join_description">Введите приглашение и назовите устройство, чтобы его узнали в семье.</string>
     <string name="fg_invitation_code">Код приглашения</string>
-    <string name="fg_live_connected">Семейное подключение включено</string>
+    <string name="fg_live_connected">Подключение включено</string>
     <string name="fg_live_connect_description">Открываем Telegram. Если подключение не удастся, можно повторить попытку.</string>
-    <string name="fg_live_service_scope">Семейный сервис одобряет устройства и выдаёт настройки подключения.</string>
+    <string name="fg_live_service_scope">Сервис 24projects.ru одобряет устройства и выдаёт настройки подключения.</string>
     <string name="fg_live_boundary">Семейный доступ и вход в Telegram — отдельные действия. Семейное подключение не означает, что обычные чаты получили сквозное шифрование.</string>
     <string name="fg_change_server">Изменить адрес сервиса</string>
     <string name="fg_apply_server">Применить адрес</string>
@@ -21,7 +21,7 @@
     <string name="fg_connection_lost">Подключение остановлено. Подключитесь заново.</string>
     <string name="fg_not_approved">Устройство пока не получило доступ. Проверьте статус заявки.</string>
     <string name="fg_request_expired">Не удалось завершить проверку устройства вовремя. Повторите действие.</string>
-    <string name="fg_network_error">Нет связи с семейным сервисом. Проверьте интернет и повторите попытку.</string>
+    <string name="fg_network_error">Нет связи с сайтом tg.24projects.ru. Проверьте интернет или попробуйте сменить сеть.</string>
     <string name="fg_live_settings_intro">Доступ этого устройства, семейный туннель и дополнительные функции клиента.</string>
     <string name="fg_live_no_tunnel">Подключитесь, чтобы открыть чаты и дополнительные настройки.</string>
     <string name="fg_live_tunnel_active">Туннель работает. Статус связи с Telegram — в списке чатов.</string>

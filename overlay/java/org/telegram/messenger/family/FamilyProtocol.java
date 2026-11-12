@@ -21,6 +21,8 @@ final class FamilyProtocol {
         return action.equals("invite") || parts[4].equals("44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a");
     }
     static String canonicalManagement(String command,String deviceId,int hours) {
+        if("set_developer".equals(command)&&deviceId!=null&&deviceId.matches("[A-Za-z][A-Za-z0-9_]{3,31}"))
+            return "{\"command\":\"set_developer\",\"username\":\""+deviceId+"\"}";
         if("list".equals(command))return "{\"command\":\"list\"}";
         if("invite".equals(command)&&hours>=1&&hours<=720)return "{\"command\":\"invite\",\"hours\":"+hours+"}";
         if(("approve".equals(command)||"revoke".equals(command))&&deviceId!=null&&deviceId.matches("[a-f0-9]{64}"))

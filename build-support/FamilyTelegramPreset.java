@@ -13,8 +13,14 @@ public final class FamilyTelegramPreset {
     private FamilyTelegramPreset() { }
 
     public static void apply(Context context) {
+        FamilyChatHeader.initialize(context.getApplicationContext());
         SharedPreferences prefs = context.getApplicationContext().getSharedPreferences("nkmrcfg", Context.MODE_PRIVATE);
         SharedPreferences.Editor editor = prefs.edit();
+        if (!prefs.getBoolean("TgRuStoriesHeaderRestored", false)) {
+            editor.putBoolean("DisableStories", false);
+            editor.putBoolean("HideStoriesFromHeader", false);
+            editor.putBoolean("TgRuStoriesHeaderRestored", true);
+        }
         String[] off = {
             "OEAppearanceSquareFab", "OEAppearanceSenderMiniAvatars", "OEAppearanceGooeyAvatarAnimation",
             "OEAppearanceGlassMessageMenu", "OEAppearanceNewLoadingStyle", "OEAppearanceNewChatHeaderStyle",

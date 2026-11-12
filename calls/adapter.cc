@@ -24,6 +24,7 @@ FGTransport transport{};
 std::atomic<bool> initialized{false};
 std::atomic<bool> allowed{false};
 std::atomic<unsigned> next_port{49152};
+std::atomic<long long> counters[9]{}; // opens, UDP dial errors, UDP tx/rx/drop, TCP dial errors, TCP tx/rx bytes, stops
 struct Address {
     sockaddr_storage value{};
     socklen_t length = 0;
@@ -127,10 +128,11 @@ void udp_worker(std::shared_ptr<Socket> socket) {
                 auto route=socket->routes.find(remote.key());
                 if(route==socket->routes.end()){
                     if(socket->routes.size()>=kMaxPeers)continue;
-                    int fd=transport.udp(remote.host.data(),remote.port);if(fd<0)continue;
+                    int fd=transport.udp(remote.host.data(),remote.port);if(fd<0){counters[1]++;continue;}
                     route=socket->routes.emplace(remote.key(),Route{fd,remote}).first;
                 }
                 ssize_t sent=::send(route->second.fd,packet.data()+sizeof(Frame),size-sizeof(Frame),MSG_DONTWAIT|MSG_NOSIGNAL);
+                if(sent == size-static_cast<ssize_t>(sizeof(Frame))) counters[2]++; else counters[4]++;
                 // UDP is lossy. Drop on downstream backpressure without falsely
                 // presenting an always-writable virtual fd as backend readiness.
                 if(sent<0 && errno!=EAGAIN && errno!=EWOULDBLOCK){release(route->second.fd);socket->routes.erase(route);}
@@ -143,11 +145,12 @@ void udp_worker(std::shared_ptr<Socket> socket) {
             }
             ssize_t size = ::recv(poller.fd, packet.data() + sizeof(Frame), kMaxPacket, MSG_DONTWAIT);
             if (size <= 0) continue;
+            counters[3]++;
             if (!live(socket)) break;
             Frame frame{kMagic, static_cast<uint16_t>(route->second.address.length), 0, route->second.address.value};
             memcpy(packet.data(), &frame, sizeof(frame));
             // Bounded, lossy UDP queue: never block the network worker on a slow reader.
-            ::send(socket->peer, packet.data(), sizeof(Frame) + size, MSG_DONTWAIT | MSG_NOSIGNAL);
+            if(::send(socket->peer, packet.data(), sizeof(Frame) + size, MSG_DONTWAIT | MSG_NOSIGNAL)<0)counters[4]++;
         }
     }
     finish(socket);
@@ -179,7 +182,10 @@ void tcp_worker(std::shared_ptr<Socket> socket) {
         if ((fds[0].revents | fds[1].revents) & (POLLERR | POLLNVAL)) break;
         if ((fds[0].revents & POLLIN) && !read_buffer(socket->peer, outbound)) break;
         if ((fds[1].revents & POLLIN) && !read_buffer(stream, inbound)) break;
-        if (!write_buffer(stream, outbound) || !write_buffer(socket->peer, inbound)) break;
+        size_t sentBefore=outbound.begin, receivedBefore=inbound.begin;
+        bool sentOk=write_buffer(stream, outbound), receivedOk=write_buffer(socket->peer, inbound);
+        counters[6]+=outbound.begin-sentBefore; counters[7]+=inbound.begin-receivedBefore;
+        if (!sentOk || !receivedOk) break;
         if ((fds[0].revents | fds[1].revents) & POLLHUP) break;
     }
     finish(socket);
@@ -192,7 +198,12 @@ bool FGCInitialize(FGTransport api) {
     if (initialized.load()) return false;
     transport = api; initialized = true; allowed = true; return true;
 }
+void FGCCounters(long long *values) {
+    for(int i=0;i<9;i++)values[i]=counters[i].load();
+    std::lock_guard<std::mutex> lock(sockets_mutex); values[9]=sockets.size();
+}
 extern "C" void FGCallsStop() {
+    counters[8]++;
     allowed = false;
     std::lock_guard<std::mutex> lock(sockets_mutex);
     for (const auto &entry : sockets) entry.second->dead = true;
@@ -217,7 +228,7 @@ extern "C" int FGC_socket(int domain, int type, int protocol) {
     socket->local.value.ss_family = domain;
     socket->local.length = domain == AF_INET ? sizeof(sockaddr_in) : sizeof(sockaddr_in6);
     assign_port(socket->local);
-    sockets[pair[0]] = socket;
+    sockets[pair[0]] = socket; counters[0]++;
     try { std::thread(kind == SOCK_DGRAM ? udp_worker : tcp_worker, socket).detach(); }
     catch (...) { sockets.erase(pair[0]); ::close(pair[0]); errno = EAGAIN; return -1; }
     return pair[0];
@@ -231,7 +242,7 @@ extern "C" int FGC_connect(int fd, const sockaddr *address, socklen_t length) {
     if (socket->kind == SOCK_STREAM) {
         if (socket->connected) { errno = EISCONN; return -1; }
         socket->stream = transport.tcp(remote.host.data(),remote.port);
-        if (socket->stream < 0) return fail();
+        if (socket->stream < 0) {counters[5]++;return fail();}
     }
     socket->remote = remote; socket->connected = true; return 0;
 }

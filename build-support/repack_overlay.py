@@ -4,8 +4,8 @@ from pathlib import Path
 from prepare_repack import ROOT,digest,within_work
 from verify_dex import verify_unique
 from dex_marker import share_marker
-parser=argparse.ArgumentParser();parser.add_argument('--base-sha256',required=True);args=parser.parse_args()
-work=within_work(ROOT/'work-preview7');base=work/'rebuilt-unsigned.apk'
+parser=argparse.ArgumentParser();parser.add_argument('--base-sha256',required=True);parser.add_argument('--work',type=Path,default=ROOT/'work-preview7');args=parser.parse_args()
+work=within_work(args.work);base=work/'rebuilt-unsigned.apk'
 if not re.fullmatch('[a-f0-9]{64}',args.base_sha256) or digest(base)!=args.base_sha256:raise ValueError('Verified preview7 base hash required')
 report=json.loads((work/'report.json').read_text(encoding='utf-8'));attempt=1
 while (work/f'overlay-rebuild-{attempt}').exists():attempt+=1

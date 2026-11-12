@@ -1,0 +1,51 @@
+{
+  "commit": "979e175a29f666768ebd0f134e27630fc9b65d4b",
+  "verified": 145,
+  "changed": [
+    {
+      "path": "TMessagesProj/jni/tgnet/Request.h",
+      "old_blob": "bfb31e2be232ea4a040ad0de2ea0495a7fc6ecd0",
+      "blob": "50fcf0ee8f17afed85887f5182727161c130b07d"
+    },
+    {
+      "path": "TMessagesProj/jni/tgnet/Defines.h",
+      "old_blob": "887b76a699aa05319ab424a4a2229aaf3570eebe",
+      "blob": "8cc5ca9237b07d8712ce858b2ff97417527eb5c1"
+    },
+    {
+      "path": "TMessagesProj/jni/tgnet/ConnectionsManager.h",
+      "old_blob": "6fa14613768cad1d526c367f1452d0de7b98db93",
+      "blob": "0b323d27e4386199e1effb65251a6fed91ee1421"
+    },
+    {
+      "path": "TMessagesProj/jni/CMakeLists.txt",
+      "old_blob": "d89e12b0fcb4a6782a20d61d8cac19bb1445e21b",
+      "blob": "658bbeba696a98cffd3b5abd4f28324b780530b3"
+    },
+    {
+      "path": "TMessagesProj/jni/tgnet/NativeByteBuffer.cpp",
+      "old_blob": "81bfb7ba8790ef59b27845389ed0705df493f230",
+      "blob": "26a4027b7734dbf716fba163c6150e3ad954dcf9"
+    },
+    {
+      "path": "TMessagesProj/jni/jni.c",
+      "old_blob": "107eec82bdc63af4ee518399bf30c3b1ab8488ac",
+      "blob": "de3b1c192cccbd79e4c5f3c30e6b5e3959e05a50"
+    },
+    {
+      "path": "TMessagesProj/jni/tgnet/MTProtoScheme.cpp",
+      "old_blob": "147c91c918b18a88a9460e8431a35b8939e6b87d",
+      "blob": "f841c6f50a28e1d8cdbdb16a95ff4d58c0e5e51c"
+    },
+    {
+      "path": "TMessagesProj/jni/tgnet/ConnectionsManager.cpp",
+      "old_blob": "1898d3ff2c40396bc7295cbb4324985a86580e85",
+      "blob": "a9f8b46df784befb6efc05ab24a9be1ba22a0329"
+    },
+    {
+      "path": "TMessagesProj/jni/TgNetWrapper.cpp",
+      "old_blob": "7369939e2fd73ac97ffed798356a47ffd8e63ce7",
+      "blob": "8c05b152b1dc7ae4d6f7b29596ed571dc8910c81"
+    }
+  ]
+}

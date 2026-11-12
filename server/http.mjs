@@ -29,6 +29,10 @@ export function apiServer(access,gateway,{trustProxy=false,push=null,manage=null
       if(req.url==='/v1/challenge') return send(res,200,access.challenge(input,ip));
       const response=access.complete(input,ip);
       if(response.action==='manage') {
+        if(response.management.command==='set_developer') {
+          const management=access.setDeveloper(response.device.id,response.management.username);
+          return send(res,200,{...access.status(access.device(response.device.id)),management});
+        }
         if(typeof manage!=='function')throw new ApiError(503,'management_unavailable');
         const management=await manage(response.device.id,response.management);
         return send(res,200,{...access.status(access.device(response.device.id)),management});

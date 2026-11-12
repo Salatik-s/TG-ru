@@ -14,12 +14,18 @@ import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.WeakHashMap;
 
-/** Local speech in Telegram's own transcription bubble. No persistence or Telegram RPC. */
+/** Selects Telegram Premium or on-device speech for the native transcription bubble. */
 public final class FamilyVoiceTranscription {
     private FamilyVoiceTranscription() { }
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private static final LinkedHashMap<String, Entry> CACHE = new LinkedHashMap<>(32, .75f, true);
+    private static final String[] VOICE_FIELDS = {
+        "voiceTranscription", "voiceTranscriptionId", "voiceTranscriptionOpen",
+        "voiceTranscriptionFinal", "translatedVoiceTranscription"
+    };
+    private static final Map<Object, Object[]> PROJECTIONS = new WeakHashMap<>();
     private static final int MAX_ENTRIES = 32, MAX_BYTES = 1024 * 1024, MAX_TEXT_BYTES = 65536;
     private static long nextId = -1;
 
@@ -44,6 +50,7 @@ public final class FamilyVoiceTranscription {
     public static void restore(Object message) {
         if (Looper.myLooper() != Looper.getMainLooper()) return;
         try {
+            if (prepareTelegram(message)) return;
             Entry entry = CACHE.get(key(message));
             if (entry != null && eligible(message)) {
                 entry.message = new WeakReference<>(message);
@@ -52,10 +59,10 @@ public final class FamilyVoiceTranscription {
         } catch (Exception ignored) { }
     }
 
-    /** Premium/trial-independent visibility; the remaining native geometry gates stay intact. */
-    public static boolean canShow(Object cell) {
+    public static boolean canShow(Object cell, boolean nativeVisible) {
         try {
             Object message = call(cell, "getMessageObject");
+            if (usesTelegram(message)) return nativeVisible;
             if (!eligible(message) || bool(message, "isQuickReply") || Boolean.TRUE.equals(field(message, "isRepostPreview"))) return false;
             if (bool(message, "isOutOwner") && !bool(message, "isSent")) return false;
             return bool(message, "isRoundVideo") || bool(message, "isVoice") && Boolean.TRUE.equals(field(cell, "useSeekBarWaveform"));
@@ -76,6 +83,46 @@ public final class FamilyVoiceTranscription {
 
     public static boolean handles(Object message) { return eligible(message); }
 
+    public static boolean usesTelegram(Object message) {
+        try {
+            // Telegram Premium has its own media limits and supports older Android versions.
+            if (message == null || !FamilyAccess.isAllowed()
+                    || (!bool(message, "isVoice") && !bool(message, "isRoundVideo"))) return false;
+            Class<?> config = Class.forName("xyz.nextalone.nagram.NaConfig");
+            Object provider = call(config.getField("INSTANCE").get(null), "getTranscribeProvider");
+            int selected = ((Number)call(provider, "Int")).intValue();
+            // These are the existing settings values for Auto and Telegram Premium.
+            if (selected != 0 && selected != 1) return false;
+            int account = ((Number)field(message, "currentAccount")).intValue();
+            Object user = Class.forName("org.telegram.messenger.UserConfig")
+                    .getMethod("getInstance", int.class).invoke(null, account);
+            return bool(user, "isPremium");
+        } catch (Exception ignored) { return false; }
+    }
+
+    public static boolean prepareTelegram(Object message) {
+        if (!usesTelegram(message)) return false;
+        try {
+            String identity = key(message);
+            Entry entry = CACHE.get(identity);
+            if (entry != null && entry.running) {
+                CACHE.remove(identity);
+                entry.epoch++;
+                if (entry.job != null) entry.job.cancel();
+            }
+            removeProjection(message);
+            return true;
+        } catch (Exception ignored) { return false; }
+    }
+
+    private static boolean removeProjection(Object message) throws Exception {
+        Object owner = field(message, "messageOwner");
+        Object[] projection = PROJECTIONS.remove(owner);
+        if (projection == null || !projection[0].equals(field(owner, "voiceTranscriptionId"))) return false;
+        for (int i = 0; i < VOICE_FIELDS.length; i++) set(owner, VOICE_FIELDS[i], projection[i + 1]);
+        return true;
+    }
+
     private static String key(Object message) throws Exception {
         int account = ((Number)field(message, "currentAccount")).intValue();
         Class<?> config = Class.forName("org.telegram.messenger.UserConfig");
@@ -95,10 +142,22 @@ public final class FamilyVoiceTranscription {
         catch (Exception ignored) { return false; }
     }
 
-    /** Completely handles onTap: never fall through to Telegram's paid/cloud RPC. */
+    /** Returns false when the original Telegram button should handle the tap. */
     public static boolean onButton(Object button) {
         try {
             Object parent = field(button, "parent"), message = call(parent, "getMessageObject");
+            if (usesTelegram(message)) {
+                Object owner = field(message, "messageOwner");
+                boolean wasLocal = PROJECTIONS.containsKey(owner);
+                if (!prepareTelegram(message)) return true;
+                if (wasLocal) {
+                    Class<?> type = button.getClass();
+                    type.getMethod("setOpen", boolean.class, boolean.class)
+                            .invoke(button, field(owner, "voiceTranscriptionOpen"), false);
+                    type.getMethod("setLoading", boolean.class, boolean.class).invoke(button, false, false);
+                }
+                return false;
+            }
             set(button, "pressed", false);
             set(button, "clickedToOpen", !Boolean.TRUE.equals(field(button, "shouldBeOpen")));
             Object selector = field(button, "selectorDrawable");
@@ -126,7 +185,14 @@ public final class FamilyVoiceTranscription {
         try {
             Context context = (Context)call(chat, "getParentActivity");
             int account = ((Number)call(chat, "getCurrentAccount")).intValue();
-            if (context == null || !eligible(message)) return false;
+            if (context == null || (!usesTelegram(message) && !eligible(message))) return false;
+            if (usesTelegram(message)) {
+                Class<?> type = Class.forName("org.telegram.ui.Components.TranscribeButton");
+                type.getMethod("transcribePressed", Class.forName("org.telegram.messenger.MessageObject"),
+                        boolean.class, Class.forName("org.telegram.ui.Cells.ChatMessageCell$ChatMessageCellDelegate"))
+                        .invoke(null, message, true, null);
+                return true;
+            }
             start(context, message, account); return true;
         } catch (Exception ignored) { return false; }
     }
@@ -134,7 +200,8 @@ public final class FamilyVoiceTranscription {
     public static void start(Context context, Object message, int account) {
         if (Looper.myLooper() != Looper.getMainLooper()) { MAIN.post(() -> start(context, message, account)); return; }
         try {
-            if (context == null || !eligible(message) || ((Number)field(message, "currentAccount")).intValue() != account) return;
+            if (context == null || !eligible(message) || usesTelegram(message) ||
+                    ((Number)field(message, "currentAccount")).intValue() != account) return;
             String identity = key(message);
             Entry existing = CACHE.get(identity);
             if (existing != null) {
@@ -179,7 +246,12 @@ public final class FamilyVoiceTranscription {
     private static Object target(Entry entry, long epoch) {
         if (entry.epoch != epoch || CACHE.get(entry.key) != entry) return null;
         Object message = entry.message.get();
-        try { if (message != null && entry.key.equals(key(message)) && eligible(message)) return message; }
+        try {
+            if (message != null && entry.key.equals(key(message)) && eligible(message)) {
+                if (!usesTelegram(message)) return message;
+                removeProjection(message);
+            }
+        }
         catch (Exception ignored) { }
         entry.epoch++; entry.running = false;
         if (entry.job != null) entry.job.cancel(); entry.job = null;
@@ -188,6 +260,16 @@ public final class FamilyVoiceTranscription {
 
     private static void apply(Entry entry, Object message) throws Exception {
         Object owner = field(message, "messageOwner");
+        Object[] projection = PROJECTIONS.get(owner);
+        Object currentId = field(owner, "voiceTranscriptionId");
+        if (projection == null || !projection[0].equals(currentId)) {
+            projection = new Object[VOICE_FIELDS.length + 1];
+            projection[0] = entry.id;
+            for (int i = 0; i < VOICE_FIELDS.length; i++) projection[i + 1] = field(owner, VOICE_FIELDS[i]);
+            PROJECTIONS.put(owner, projection);
+        } else {
+            projection[0] = entry.id;
+        }
         set(owner, "voiceTranscription", entry.text);
         set(owner, "voiceTranscriptionId", entry.id);
         set(owner, "voiceTranscriptionOpen", entry.open);

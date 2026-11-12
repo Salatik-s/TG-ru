@@ -67,3 +67,65 @@ test('HTTP management requires signed owner proof, invokes shared membership han
   assert.equal((await fetch(root+'/owner',{method:'POST'})).status,404);
   assert.throws(()=>family.challenge('manage',{command:'list'}),error('owner_required',403));
 });
+
+test('developer contact changes require owner proof and preserve legacy config and membership APIs', async t=>{
+  const {access,device}=setup(t),owner=device('Owner'),family=device('Family'),pending=device('Pending',false);
+  access.owner('set-owner',owner.id);
+  assert.equal(owner.complete(owner.challenge('config')).result.developer_username,'prince_skazki');
+  assert.equal(pending.complete(pending.challenge()).result.developer_username,undefined);
+  assert.throws(()=>family.challenge('manage',{command:'set_developer',username:'new_developer'}),error('owner_required',403));
+  assert.throws(()=>access.setDeveloper(family.id,'new_developer'),error('owner_required',403));
+  for(const username of ['https://evil.example','x/y','a','name?x=1','name\n','a'.repeat(33)]) {
+    assert.throws(()=>owner.challenge('manage',{command:'set_developer',username}),error('invalid_management',400));
+  }
+  assert.throws(()=>owner.challenge('manage',{command:'set_developer',username:'new_developer',device_id:family.id}),error('invalid_management',400));
+  let gatewayCalls=0;
+  const server=apiServer(access,{ready:true,client:()=>{gatewayCalls++;return {protocol:'test'};}});
+  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+  t.after(()=>new Promise(resolve=>server.close(resolve)));
+  const root='http://127.0.0.1:'+server.address().port;
+  const c=owner.challenge('manage',{command:'set_developer',username:'new_developer'}),proof=owner.proof(c);
+  assert.match(c.message,/[a-f0-9]{64}$/);
+  // A changed completion payload cannot replace the command committed in the signed challenge.
+  proof.payload={command:'set_developer',username:'attacker'};
+  const post=payload=>fetch(root+'/v1/complete',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});
+  const response=await post(proof);
+  assert.equal(response.status,200);
+  const changed=await response.json();
+  assert.equal(changed.management.developer_username,'new_developer');
+  assert.equal(changed.developer_username,'new_developer');
+  assert.equal((await post(proof)).status,410);
+  const legacy=await post(family.proof(family.challenge('config')));
+  assert.equal(legacy.status,200);
+  const config=await legacy.json();
+  assert.equal(config.status,'approved');
+  assert.equal(config.developer_username,'new_developer');
+  assert.equal(config.gateway.protocol,'test');
+  assert.equal(gatewayCalls,1);
+  assert.equal(access.owner('list').length,3);
+});
+
+test('developer contact checks ownership again before committing and survives database reopening',async t=>{
+  const {mkdtempSync,rmSync}=await import('node:fs');
+  const {tmpdir}=await import('node:os');
+  const {join}=await import('node:path');
+  const directory=mkdtempSync(join(tmpdir(),'tg-ru-contact-'));
+  t.after(()=>rmSync(directory,{recursive:true,force:true}));
+  const pepper='contact-test-pepper-'.repeat(4);
+  const path=join(directory,'access.sqlite');
+  const access=new Access(path,{pepper});
+  const key=generateKeyPairSync('ec',{namedCurve:'prime256v1'});
+  const public_key=key.publicKey.export({type:'spki',format:'der'}).toString('base64');
+  const invite=access.owner('invite');
+  const c=access.challenge({public_key,action:'invite',payload:{code:invite.code,name:'Owner'}},'test');
+  access.complete({challenge_id:c.challenge_id,signature:sign('sha256',Buffer.from(c.message),key.privateKey).toString('base64')},'test');
+  access.owner('approve',c.device_id);
+  access.owner('set-owner',c.device_id);
+  access.setDeveloper(c.device_id,'saved_developer');
+  access.owner('revoke',c.device_id);
+  assert.throws(()=>access.setDeveloper(c.device_id,'overwritten'),error('owner_required',403));
+  access.close();
+  const reopened=new Access(path,{pepper});
+  try {assert.equal(reopened.developerUsername(),'saved_developer');}
+  finally {reopened.close();}
+});

@@ -11,10 +11,11 @@ PIN={
  'setMessageObject(Lorg/telegram/messenger/MessageObject;Lorg/telegram/messenger/MessageObject$GroupedMessages;ZZZZ)V':'b37e78869ae4aebdc0f0e4a742885f21d20b60322ca506b96b07b7036489ba6a',
 }
 METHOD=re.compile(r'(?ms)^\.method [^\n]+\n.*?^\.end method')
-def patch(source):
+def patch(source, pins=None):
+ if pins is None:pins=PIN
  if 'familyInlineOriginal' in source:raise ValueError('Already patched; use a clean pinned cell')
  if '.field private additionalPaddingHeight:I' not in source:raise ValueError('Missing original padding field')
- for signature,expected in PIN.items():
+ for signature,expected in pins.items():
   matches=[m for m in METHOD.finditer(source) if m.group(0).splitlines()[0].endswith(' '+signature)]
   if len(matches)!=1:raise ValueError('Method count changed: '+signature)
   match=matches[0];original=match.group(0)

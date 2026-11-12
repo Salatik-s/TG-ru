@@ -93,6 +93,12 @@ public final class FamilyPush {
         } catch (RuntimeException ignored) { state = "open_app_to_start"; }
     }
 
+    static void onChatsOpened(Activity activity) {
+        if (!authorized()) return;
+        registerTelegram();
+        ensureService(activity);
+    }
+
     private static void registerTelegram() {
         if (!authorized()) return;
         try {
