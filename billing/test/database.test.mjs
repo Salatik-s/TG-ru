@@ -141,6 +141,8 @@ test('account deletion removes dependent data and retains the unlinked payment',
   db.prepare('INSERT INTO subscriptions VALUES (?, ?, ?, NULL, ?)').run('first', now + 100, 'grant', 'grant');
   db.prepare('INSERT INTO payments VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
     .run('payment', 'first', 'platega', 'provider-tx', 19900, 'RUB', 'paid', now, now, digest(4));
+  db.prepare("UPDATE subscriptions SET source = 'payment', grant_id = NULL, payment_id = ?")
+    .run('payment');
   db.prepare('INSERT INTO reconcile_cases VALUES (?, ?, ?, ?, ?, ?, NULL, NULL)')
     .run('case', 'first', 19900, now, 'provider-tx', 'new');
 
