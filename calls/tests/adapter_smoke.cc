@@ -93,5 +93,8 @@ int main(){
         reader.join();CHECK(received==-1);CHECK(fcntl(pipes[0],F_GETFD)>=0&&fcntl(pipes[1],F_GETFD)>=0);close(pipes[0]);close(pipes[1]);
     }
     usleep(150000);CHECK(released==routes&&!bad_release);CHECK(fd_count()==initial_fds);
+    long long stats[10]{}; FGCCounters(stats);
+    CHECK(stats[0]>=67 && stats[1]==0 && stats[2]>=68 && stats[3]>=68);
+    CHECK(stats[5]==0 && stats[6]>=3 && stats[7]>=3 && stats[8]>=1 && stats[9]==0);
     puts("PASS adapter: stable epoll fd, TCP, multi-peer UDP, PEEK, scatter/truncation/timestamp, mapped IPv6, no DNS/raw fallback, syscall gate, lease/stop cleanup, 64 concurrent-close/reuse cycles");
 }

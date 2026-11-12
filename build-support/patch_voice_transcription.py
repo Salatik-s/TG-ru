@@ -3,6 +3,7 @@ from pathlib import Path
 import argparse, hashlib, json, re
 
 CELL = 'Lorg/telegram/ui/Cells/ChatMessageCell;'
+BUTTON = 'Lorg/telegram/ui/Components/TranscribeButton;'
 HELPER = 'Lorg/telegram/messenger/family/FamilyVoiceTranscription;'
 METHOD = re.compile(r'(?ms)^\.method [^\n]+\n.*?^\.end method')
 PINS = {
@@ -18,11 +19,12 @@ PINS = {
  }
 }
 
-def patch(source, name):
+def patch(source, name, pins=None):
+ if pins is None:pins=PINS
  if 'familyVoiceOriginal' in source: raise ValueError('Already patched: ' + name)
  if name == 'ChatMessageCell' and 'familyInlineOriginalSetMessageObject' not in source:
   raise ValueError('Apply pinned inline Python wrappers first')
- for signature, expected in PINS[name].items():
+ for signature, expected in pins[name].items():
   matches = [m for m in METHOD.finditer(source) if m.group(0).splitlines()[0].endswith(' ' + signature)]
   if len(matches) != 1: raise ValueError('Method count changed: ' + signature)
   match = matches[0]; original = match.group(0)
@@ -34,7 +36,8 @@ def patch(source, name):
   if method == 'updateWaveform':
    body = f'''    .locals 1
     invoke-virtual {{p0}}, {CELL}->{renamed}()V
-    invoke-static {{p0}}, {HELPER}->canShow(Ljava/lang/Object;)Z
+    iget-boolean v0, p0, {CELL}->useTranscribeButton:Z
+    invoke-static {{p0, v0}}, {HELPER}->canShow(Ljava/lang/Object;Z)Z
     move-result v0
     iput-boolean v0, p0, {CELL}->useTranscribeButton:Z
     const/4 v0, 0x0
@@ -46,24 +49,53 @@ def patch(source, name):
     invoke-virtual/range {{p0 .. p6}}, {CELL}->{renamed}({descriptor}
     return-void'''
   elif method == 'onTap':
-   body = f'''    .locals 0
+   body = f'''    .locals 1
     invoke-static {{p0}}, {HELPER}->onButton(Ljava/lang/Object;)Z
+    move-result v0
+    if-nez v0, :done
+    invoke-virtual {{p0}}, {BUTTON}->{renamed}()V
+    :done
     return-void'''
   elif method == 'transcribePressed':
-   body = f'''    .locals 0
+   body = f'''    .locals 1
+    invoke-static {{p0}}, {HELPER}->prepareTelegram(Ljava/lang/Object;)Z
+    move-result v0
+    if-eqz v0, :local
+    invoke-static {{p0, p1, p2}}, {BUTTON}->{renamed}({descriptor}
+    return-void
+    :local
     invoke-static {{p0, p1, p2}}, {HELPER}->pressed(Ljava/lang/Object;ZLjava/lang/Object;)V
     return-void'''
-  elif method == 'isTranscribing':
-   body = f'''    .locals 1
-    invoke-static {{p0}}, {HELPER}->isRunning(Ljava/lang/Object;)Z
-    move-result v0
-    return v0'''
   else:
-   body = '''    .locals 1
-    const/4 v0, 0x0
+   local = f'    invoke-static {{p0}}, {HELPER}->isRunning(Ljava/lang/Object;)Z\n    move-result v0' if method == 'isTranscribing' else '    const/4 v0, 0x0'
+   body = f'''    .locals 1
+    invoke-static {{p0}}, {HELPER}->usesTelegram(Ljava/lang/Object;)Z
+    move-result v0
+    if-eqz v0, :local
+    invoke-static {{p0}}, {BUTTON}->{renamed}({descriptor}
+    move-result v0
+    return v0
+    :local
+{local}
     return v0'''
   source = source[:match.start()] + saved + '\n\n' + header + '\n' + body + '\n.end method' + source[match.end():]
  return source
+
+def upgrade(source, name):
+ """Reapply the current wrappers to the untouched native methods saved in preview12."""
+ for signature in PINS[name]:
+  method, descriptor = signature.split('(', 1)
+  renamed = 'familyVoiceOriginal' + method[0].upper() + method[1:]
+  matches = list(METHOD.finditer(source))
+  pairs = [(a, b) for a, b in zip(matches, matches[1:])
+           if a[0].splitlines()[0].endswith(' ' + renamed + '(' + descriptor)
+           and b[0].splitlines()[0].endswith(' ' + signature)]
+  if len(pairs) != 1:
+   raise ValueError('Unexpected saved native method and wrapper: ' + signature)
+  original, wrapper = pairs[0]
+  restored = original[0].replace(' ' + renamed + '(', ' ' + method + '(', 1)
+  source = source[:original.start()] + restored + source[wrapper.end():]
+ return patch(source, name)
 
 def prepare(decoded):
  changes = []

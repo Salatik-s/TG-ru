@@ -11,6 +11,8 @@ struct FGTransport {
     void (*release)(int);
 };
 bool FGCInitialize(FGTransport api);
+// Numeric-only process counters; never endpoint addresses, keys or packet contents.
+void FGCCounters(long long *values);
 extern "C" {
 __attribute__((visibility("default"))) void FGCallsStop();
 __attribute__((visibility("default"))) int FGCallsResume();

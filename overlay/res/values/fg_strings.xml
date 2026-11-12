@@ -6,7 +6,7 @@
   <string name="fg_security">Безопасность</string>
   <string name="fg_join_title">Подключение к семье</string>
   <string name="fg_join_heading">Добавьте это устройство</string>
-  <string name="fg_service_address">Адрес семейного сервиса</string>
+  <string name="fg_service_address">Адрес сервиса</string>
   <string name="fg_device_name">Имя устройства</string>
   <string name="fg_request_access">Отправить заявку</string>
   <string name="fg_invite_not_valid">Приглашение недействительно. Проверьте код или получите новое.</string>
@@ -19,7 +19,6 @@
   <string name="fg_check_status">Проверить статус</string>
   <string name="fg_device_approved">Устройство одобрено</string>
   <string name="fg_no_fresh_data">Нет свежих данных</string>
-  <string name="fg_privacy_title">Дополнительная приватность</string>
   <string name="fg_local_history">Локальная история</string>
   <string name="fg_access_revoked">Семейный доступ отозван</string>
 </resources>

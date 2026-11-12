@@ -112,3 +112,11 @@ extern "C" PUBLIC jint JNI_OnLoad(JavaVM*,void*){return FGCallsInstall()==0?JNI_
 extern "C" PUBLIC jboolean Java_org_telegram_messenger_family_FamilyCalls_nativeInstalled(JNIEnv*,jclass){return installed.load()?JNI_TRUE:JNI_FALSE;}
 extern "C" PUBLIC jint Java_org_telegram_messenger_family_FamilyCalls_nativeResume(JNIEnv*,jclass){return FGCallsResume();}
 extern "C" PUBLIC void Java_org_telegram_messenger_family_FamilyCalls_nativeStop(JNIEnv*,jclass){FGCallsStop();}
+
+extern "C" PUBLIC jlongArray Java_org_telegram_messenger_family_FamilyCalls_nativeCounters(JNIEnv *env,jclass){
+    long long snapshot[10]{}; FGCCounters(snapshot); jlong values[10];
+    for(int i=0;i<10;i++)values[i]=static_cast<jlong>(snapshot[i]);
+    jlongArray result=env->NewLongArray(10);
+    if(result)env->SetLongArrayRegion(result,0,10,values);
+    return result;
+}

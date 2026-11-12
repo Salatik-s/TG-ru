@@ -23,6 +23,12 @@ public final class FamilyCalls {
         if (loaded) nativeStop();
     }
 
+    /** Process totals: opens, UDP dial errors/tx/rx/drop, TCP dial errors/tx bytes/rx bytes, stops, active sockets. */
+    public static synchronized long[] diagnosticCounters() {
+        return loaded ? nativeCounters() : new long[10];
+    }
+
+    private static native long[] nativeCounters();
     private static native boolean nativeInstalled();
     private static native int nativeResume();
     private static native void nativeStop();

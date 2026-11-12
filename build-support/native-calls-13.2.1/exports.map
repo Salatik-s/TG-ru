@@ -1,0 +1,13 @@
+{
+  global:
+    FGCallsInstall;
+    FGCallsInstalled;
+    FGCallsStop;
+    FGCallsResume;
+    JNI_OnLoad;
+    Java_org_telegram_messenger_family_FamilyCalls_nativeCounters;
+    Java_org_telegram_messenger_family_FamilyCalls_nativeInstalled;
+    Java_org_telegram_messenger_family_FamilyCalls_nativeResume;
+    Java_org_telegram_messenger_family_FamilyCalls_nativeStop;
+  local: *;
+};

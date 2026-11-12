@@ -39,6 +39,7 @@ import javax.net.ssl.HttpsURLConnection;
 public final class FamilyAccess {
     public static final String DEFAULT_SERVER = "https://24projects.ru:8443";
     private static final String KEY_ALIAS = "familygram.installation.p256.v1";
+    private static final String ROUTE_FAILOVER = "allow_automatic_reality";
     private static final long LEASE_MS = 75_000L;
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private static final ScheduledExecutorService IO = Executors.newSingleThreadScheduledExecutor();
@@ -50,11 +51,14 @@ public final class FamilyAccess {
     private static volatile String activeGatewayHash;
     private static volatile String installationId = "";
     private static volatile boolean phoneOwner;
+    private static volatile boolean previouslyApproved;
     private static volatile String server = DEFAULT_SERVER;
     private static volatile String deviceName = "Android";
     private static SharedPreferences preferences;
     private static Context applicationContext;
     private static ScheduledFuture<?> poll;
+    private static int consecutiveFailures;
+    private static final FamilyRouteFailover routeFailover = new FamilyRouteFailover();
 
     private FamilyAccess() { }
 
@@ -81,10 +85,12 @@ public final class FamilyAccess {
         applicationContext = context.getApplicationContext();
         preferences = context.getApplicationContext().getSharedPreferences("familygram_access_v1", Context.MODE_PRIVATE);
         server = DEFAULT_SERVER;
+        previouslyApproved = preferences.getBoolean("last_known_approved", false);
         preferences.edit().putString("server", DEFAULT_SERVER).apply();
         deviceName = preferences.getString("name", Build.MODEL == null ? "Android" : Build.MODEL);
+        FamilyConnectionMonitor.init(applicationContext);
         WATCH.scheduleWithFixedDelay(() -> {
-            if (allowedUntil != 0 && (SystemClock.elapsedRealtime() >= allowedUntil || !nativeReady())) {
+            if (!snapshot.busy && allowedUntil != 0 && (SystemClock.elapsedRealtime() >= allowedUntil || !nativeReady())) {
                 invalidate("connection_lost");
             }
         }, 1, 1, TimeUnit.SECONDS);
@@ -100,6 +106,24 @@ public final class FamilyAccess {
                 + shortId.substring(8, 12) + " " + shortId.substring(12, 16);
     }
     public static Snapshot state() { return snapshot; }
+    // Presentation hint only. Opening the tunnel still requires a current authorized HTTPS exchange.
+    public static boolean previouslyApproved() { return previouslyApproved; }
+    static boolean hasCachedAccount() {
+        Context context = applicationContext;
+        if (!previouslyApproved || context == null) return false;
+        if (context.getSharedPreferences("userconfing", Context.MODE_PRIVATE).contains("user")) return true;
+        for (int slot = 1; slot < 10; slot++) {
+            if (context.getSharedPreferences("userconfig" + slot, Context.MODE_PRIVATE).contains("user")) return true;
+        }
+        return false;
+    }
+
+    private static void rememberApproval(boolean approved) {
+        if (previouslyApproved == approved) return;
+        previouslyApproved = approved;
+        if (approved) preferences.edit().putBoolean("last_known_approved", true).apply();
+        else preferences.edit().remove("last_known_approved").commit();
+    }
     public static boolean isPhoneOwner() { return phoneOwner && isAllowed(); }
     public static boolean isAllowed() {
         return allowedUntil > SystemClock.elapsedRealtime() && nativeReady();
@@ -140,6 +164,33 @@ public final class FamilyAccess {
         begin(connected ? "config" : "status", null, connected);
     }
     public static void connect() { begin("config", null, true); }
+
+    static synchronized void resumeConnection() {
+        if (previouslyApproved && !isAllowed() && snapshot.retrySeconds() == 0
+                && FamilyConnectionMonitor.hasNetwork()) connect();
+    }
+
+    static synchronized void reportTransportState(int state) {
+        boolean connecting = routeFailoverEnabled() && (state == 1 || state == 4)
+                && isAllowed() && FamilyConnectionMonitor.hasNetwork();
+        if (routeFailover.observe(connecting, SystemClock.elapsedRealtime()))
+            schedulePollMillis(FamilyRouteFailover.CONNECT_TIMEOUT_MS);
+    }
+
+    static boolean hasRouteFailoverChoice() {
+        return preferences != null && preferences.contains(ROUTE_FAILOVER);
+    }
+
+    static boolean routeFailoverEnabled() {
+        return preferences != null && preferences.getBoolean(ROUTE_FAILOVER, false);
+    }
+
+    static synchronized void setRouteFailoverEnabled(boolean enabled) {
+        if (preferences == null) return;
+        preferences.edit().putBoolean(ROUTE_FAILOVER, enabled).apply();
+        reportTransportState(FamilyConnectionMonitor.transportState());
+        if (!enabled && routeFailover.usingFallback() && isAllowed()) schedulePollMillis(0);
+    }
     public static void submitInvite(String invitation) {
         String code = invitation == null ? "" : invitation.trim().toUpperCase(Locale.ROOT);
         if (!code.matches("[A-Z0-9-]{1,64}")) {
@@ -167,7 +218,9 @@ public final class FamilyAccess {
             if (EPOCH.get() != epoch) return;
             String status = response.getString("status");
             if (!status.matches("new|pending|approved|blocked|revoked")) throw new AccessFailure("invalid_response", 0);
+            rememberApproval(status.equals("approved"));
             phoneOwner = status.equals("approved") && response.optBoolean("phone_owner",false);
+            if (status.equals("approved")) FamilyDeveloperContact.update(applicationContext, response.optString("developer_username", ""));
             long wait = Math.max(0, response.getLong("cooldown_until") - response.getLong("server_time"));
             long retry = SystemClock.elapsedRealtime() + Math.min(wait, 86_400L) * 1000;
             if (!status.equals("approved")) {
@@ -191,7 +244,11 @@ public final class FamilyAccess {
                     if (EPOCH.get() != epoch) { safeStop(); return; }
                     activeGatewayHash = gatewayHash;
                     allowedUntil = SystemClock.elapsedRealtime() + LEASE_MS;
-                    schedulePoll();
+                    consecutiveFailures = 0;
+                    reportTransportState(FamilyConnectionMonitor.transportState());
+                    schedulePoll(55);
+                    long routeCheck = routeFailover.millisUntilCheck(SystemClock.elapsedRealtime());
+                    if (routeCheck > 0) schedulePollMillis(routeCheck);
                 }
                 FamilyPush.configure(applicationContext, response.getJSONObject("notifications"));
             }
@@ -200,16 +257,38 @@ public final class FamilyAccess {
             if (EPOCH.get() != epoch) return;
             String error = e instanceof AccessFailure ? ((AccessFailure)e).code : "network_error";
             long retry = e instanceof AccessFailure ? ((AccessFailure)e).retrySeconds : 0;
-            clearNative();
+            boolean transientFailure = error.matches("network_error|server_unavailable|gateway_unavailable|rate_limited|too_many_challenges|operation_in_progress");
+            if (!transientFailure) clearNative();
             String status = error.equals("blocked") || error.equals("revoked") ? error : snapshot.status;
             if (error.equals("not_approved")) status = "unknown";
-            publish(new Snapshot(status, error, false, false, SystemClock.elapsedRealtime() + retry * 1000));
+            if (error.equals("not_approved") || error.equals("revoked") || error.equals("blocked"))
+                rememberApproval(false);
+            synchronized (FamilyAccess.class) {
+                if (previouslyApproved && openTunnel) {
+                    int delay = 2 << Math.min(consecutiveFailures++, 4);
+                    schedulePoll(Math.max(delay, retry));
+                }
+                publish(new Snapshot(status, error, false, isAllowed(), SystemClock.elapsedRealtime() + retry * 1000));
+            }
         }
     }
 
-    private static synchronized void schedulePoll() {
+    private static synchronized void schedulePoll(long seconds) {
+        schedulePollMillis(TimeUnit.SECONDS.toMillis(seconds));
+    }
+
+    private static synchronized void schedulePollMillis(long delay) {
+        if (poll != null && !poll.isDone() && poll.getDelay(TimeUnit.MILLISECONDS) <= delay) return;
         if (poll != null) poll.cancel(false);
-        poll = IO.schedule(() -> begin("config", null, true), 60, TimeUnit.SECONDS);
+        poll = IO.schedule(() -> {
+            synchronized (FamilyAccess.class) {
+                poll = null;
+                if (snapshot.busy) schedulePoll(2);
+                else if (snapshot.retrySeconds() > 0) schedulePoll(snapshot.retrySeconds());
+                else if (!FamilyConnectionMonitor.hasNetwork()) schedulePoll(30);
+                else begin("config", null, true);
+            }
+        }, delay, TimeUnit.MILLISECONDS);
     }
 
     /** Fail closed; native transport is stopped before failure notification. */
@@ -224,11 +303,13 @@ public final class FamilyAccess {
                 JSONObject payload=new JSONObject().put("command",command);
                 if("invite".equals(command))payload.put("hours",hours);
                 else if("approve".equals(command)||"revoke".equals(command))payload.put("device_id",deviceId);
+                else if("set_developer".equals(command))payload.put("username",deviceId);
                 else if(!"list".equals(command))throw new AccessFailure("invalid_management",0);
                 JSONObject response=proofRequest(server,"manage",payload);
                 phoneOwner=response.optBoolean("phone_owner",false);
                 if(!phoneOwner)throw new AccessFailure("owner_required",0);
                 data=response.getJSONObject("management");
+                FamilyDeveloperContact.update(applicationContext, response.optString("developer_username", ""));
             } catch(Exception failure) {
                 error=failure instanceof AccessFailure?((AccessFailure)failure).code:"network_error";
                 if("owner_required".equals(error))phoneOwner=false;
@@ -240,8 +321,10 @@ public final class FamilyAccess {
     }
     private static synchronized void invalidate(String error) {
         EPOCH.incrementAndGet();
+        if (error.equals("blocked") || error.equals("revoked")) rememberApproval(false);
         clearNative();
         publish(new Snapshot(snapshot.status, error, false, false, snapshot.retryAtElapsed));
+        if (error.equals("connection_lost") && previouslyApproved) schedulePoll(Math.max(2, snapshot.retrySeconds()));
     }
     private static synchronized void clearNative() {
         allowedUntil = 0;
@@ -257,6 +340,7 @@ public final class FamilyAccess {
     }
     private static void publish(Snapshot state) {
         snapshot = state;
+        FamilyConnectionMonitor.accessChanged(state);
         MAIN.post(() -> {
             for (Listener listener : LISTENERS) {
                 try { listener.onFamilyAccessChanged(snapshot); } catch (RuntimeException ignored) { }
@@ -288,7 +372,7 @@ public final class FamilyAccess {
         }
         String message = challenge.getString("message");
         boolean challengeBound="manage".equals(action)
-                ?FamilyProtocol.validManagementChallenge(message,challengeId,FamilyProtocol.canonicalManagement(payload.getString("command"),payload.optString("device_id",""),payload.optInt("hours",24)))
+                ?FamilyProtocol.validManagementChallenge(message,challengeId,FamilyProtocol.canonicalManagement(payload.getString("command"),payload.optString("username",payload.optString("device_id","")),payload.optInt("hours",24)))
                 :FamilyProtocol.validChallenge(message, challengeId, action);
         if (!challengeBound) {
             throw new AccessFailure("invalid_response", 0);
@@ -350,11 +434,22 @@ public final class FamilyAccess {
             for (int i = 0; i < alternatives.length(); i++) {
                 JSONObject candidate = alternatives.getJSONObject(i);
                 if ("tls".equals(candidate.optString("security")) && "ws".equals(candidate.optString("transport"))) {
-                    return validGateway(candidate);
+                    return selectRoute(validGateway(candidate), response);
                 }
             }
         }
-        return validGateway(response.getJSONObject("gateway"));
+        JSONObject gateway = validGateway(response.getJSONObject("gateway"));
+        if ("reality".equals(gateway.getString("security")) && !routeFailoverEnabled())
+            throw new AccessFailure("invalid_gateway", 0);
+        return gateway;
+    }
+
+    private static synchronized JSONObject selectRoute(JSONObject primary, JSONObject response) throws Exception {
+        boolean wasFallback = routeFailover.usingFallback();
+        boolean fallback = routeFailover.select(SystemClock.elapsedRealtime(),
+                FamilyConnectionMonitor.callActive(), routeFailoverEnabled());
+        if (fallback != wasFallback) FamilyConnectionMonitor.routeChanged(fallback ? "reality" : "wss");
+        return fallback ? validGateway(response.getJSONObject("gateway")) : primary;
     }
 
     private static JSONObject validGateway(JSONObject source) throws Exception {

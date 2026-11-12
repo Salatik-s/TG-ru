@@ -1,6 +1,5 @@
 package org.telegram.messenger.family;
 
-import android.os.Bundle;
 import android.os.Build;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
@@ -17,58 +16,13 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.Switch;
 import android.widget.TextView;
-import android.widget.Toast;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import org.telegram.messenger.R;
 
-/** Plain-language controls over the fork's real packet filters; no second settings store. */
-public final class FamilyPrivacyActivity extends FamilyUi {
-    private final Map<String, Switch> controls = new LinkedHashMap<>();
-    private Switch master;
-    private Switch deleted;
-    private boolean updating;
+/** Shared Telegram-themed settings rows, insets, typography and accessibility. */
+abstract class FamilySettingsPage extends FamilyUi {
     private int pageColor, rowColor, dividerColor, rippleColor, trackOff, trackOn, thumbOff, thumbOn;
-    private static final String[] FLAGS = {"sendOnlinePackets", "sendReadMessagePackets", "sendUploadProgress", "sendReadStoriesPackets", "sendOfflinePacketAfterOnline"};
-
-    @Override protected void onCreate(Bundle state) {
-        super.onCreate(state);
-        if (!FamilyAccess.isAllowed()) { FamilyBinaryGuard.redirect(this); finish(); return; }
-        setTitle(R.string.fg_ghost_settings_title);
-        createSettingsLayout();
-        master = toggle(R.string.fg_ghost_master, R.string.fg_ghost_master_summary);
-        master.setOnCheckedChangeListener((v, checked) -> {
-            if (updating) return;
-            boolean success = true;
-            for (String flag : FLAGS) success &= setFlag(flag, flag.equals("sendOfflinePacketAfterOnline") ? checked : !checked);
-            if (!success) error();
-            update();
-        });
-        groupSpace();
-        item(FLAGS[0], R.string.fg_hide_online, R.string.fg_hide_online_summary);
-        divider();
-        item(FLAGS[1], R.string.fg_hide_read, R.string.fg_hide_read_summary);
-        divider();
-        item(FLAGS[2], R.string.fg_hide_typing, R.string.fg_hide_typing_summary);
-        divider();
-        item(FLAGS[3], R.string.fg_hide_stories, R.string.fg_hide_stories_summary);
-        divider();
-        item(FLAGS[4], R.string.fg_offline_after, R.string.fg_offline_after_summary);
-        note(getString(R.string.fg_privacy_limit));
-        groupHeading(R.string.fg_deleted_heading);
-        deleted = toggle(R.string.fg_save_deleted_switch, R.string.fg_deleted_description);
-        deleted.setChecked(FamilyFeatures.saveDeletedEnabled());
-        deleted.setOnCheckedChangeListener((v, checked) -> {
-            if (updating) return;
-            if (!FamilyFeatures.setSaveDeleted(checked)) { updating = true; v.setChecked(!checked); updating = false; error(); }
-            refreshRow(deleted);
-        });
-        note(getString(R.string.fg_save_deleted_limit) + "\n\n" + getString(R.string.fg_deleted_where));
-        update();
-    }
-
     /** This screen owns its edge-to-edge layout; other FamilyUi screens are unchanged. */
-    private void createSettingsLayout() {
+    protected void createSettingsLayout(int titleResource) {
         boolean dark = (getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK)
                 == android.content.res.Configuration.UI_MODE_NIGHT_YES;
         try { dark = (Boolean) Class.forName("org.telegram.ui.ActionBar.Theme").getMethod("isCurrentThemeDark").invoke(null); }
@@ -115,7 +69,7 @@ public final class FamilyPrivacyActivity extends FamilyUi {
         back.setOnClickListener(v -> finish());
         toolbar.addView(back, new LinearLayout.LayoutParams(dp(56), dp(56)));
         TextView title = new TextView(this);
-        title.setText(R.string.fg_ghost_settings_title); title.setTextColor(barTitle); title.setTextSize(20);
+        title.setText(titleResource); title.setTextColor(barTitle); title.setTextSize(20);
         title.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         title.setSingleLine(true); title.setEllipsize(TextUtils.TruncateAt.END);
         title.setGravity(Gravity.CENTER_VERTICAL);
@@ -154,7 +108,7 @@ public final class FamilyPrivacyActivity extends FamilyUi {
         setContentView(root); root.requestApplyInsets();
     }
 
-    private Switch toggle(int title, int summary) {
+    protected Switch toggle(int title, int summary) {
         ToggleRow row = new ToggleRow(title, summary);
         content.addView(row, new LinearLayout.LayoutParams(-1, -2));
         return row.control;
@@ -163,27 +117,23 @@ public final class FamilyPrivacyActivity extends FamilyUi {
         final Switch control;
         private final LinearLayout labels;
         ToggleRow(int titleResource, int summaryResource) {
-            super(FamilyPrivacyActivity.this);
+            super(FamilySettingsPage.this);
             setOrientation(HORIZONTAL); setGravity(Gravity.CENTER_VERTICAL);
             setMinimumHeight(dp(72)); setPadding(dp(16), dp(10), dp(12), dp(10));
             setBackground(new RippleDrawable(ColorStateList.valueOf(rippleColor), new ColorDrawable(rowColor), null));
-            labels = new LinearLayout(FamilyPrivacyActivity.this); labels.setOrientation(VERTICAL);
-            TextView title = new TextView(FamilyPrivacyActivity.this);
+            labels = new LinearLayout(FamilySettingsPage.this); labels.setOrientation(VERTICAL);
+            TextView title = new TextView(FamilySettingsPage.this);
             title.setText(titleResource); title.setTextColor(ink); title.setTextSize(16);
             title.setGravity(Gravity.START); title.setIncludeFontPadding(false);
             String summary = getString(summaryResource);
-            if (summaryResource == R.string.fg_ghost_master_summary) {
-                int sentence = summary.indexOf('.');
-                if (sentence >= 0) summary = summary.substring(0, sentence + 1);
-            }
-            TextView detail = new TextView(FamilyPrivacyActivity.this);
+            TextView detail = new TextView(FamilySettingsPage.this);
             detail.setText(summary); detail.setTextColor(muted); detail.setTextSize(13);
             detail.setGravity(Gravity.START); detail.setIncludeFontPadding(false);
             labels.addView(title, new LinearLayout.LayoutParams(-1, -2));
             LinearLayout.LayoutParams detailParams = new LinearLayout.LayoutParams(-1, -2);
             detailParams.topMargin = dp(4); labels.addView(detail, detailParams);
             addView(labels, new LinearLayout.LayoutParams(0, -2, 1f));
-            control = new Switch(FamilyPrivacyActivity.this);
+            control = new Switch(FamilySettingsPage.this);
             control.setShowText(false); control.setSwitchMinWidth(dp(36)); control.setMinimumHeight(dp(48));
             control.setGravity(Gravity.CENTER); control.setSaveEnabled(false);
             control.setThumbTintList(new ColorStateList(new int[][]{new int[]{android.R.attr.state_checked}, new int[]{}}, new int[]{thumbOn, thumbOff}));
@@ -209,10 +159,10 @@ public final class FamilyPrivacyActivity extends FamilyUi {
             sendAccessibilityEvent(android.view.accessibility.AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED);
         }
     }
-    private void groupSpace() {
+    protected void groupSpace() {
         View gap = new View(this); content.addView(gap, new LinearLayout.LayoutParams(-1, dp(12)));
     }
-    private void groupHeading(int resource) {
+    protected void groupHeading(int resource) {
         TextView heading = new TextView(this);
         heading.setText(resource); heading.setTextColor(primary); heading.setTextSize(14);
         heading.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
@@ -220,19 +170,19 @@ public final class FamilyPrivacyActivity extends FamilyUi {
         if (Build.VERSION.SDK_INT >= 28) heading.setAccessibilityHeading(true);
         content.addView(heading, new LinearLayout.LayoutParams(-1, -2));
     }
-    private void divider() {
+    protected void divider() {
         LinearLayout strip = new LinearLayout(this); strip.setBackgroundColor(rowColor);
         strip.setPaddingRelative(dp(16), 0, 0, 0);
         View line = new View(this); line.setBackgroundColor(dividerColor);
         strip.addView(line, new LinearLayout.LayoutParams(-1, 1));
         content.addView(strip, new LinearLayout.LayoutParams(-1, 1));
     }
-    private void note(String value) {
+    protected void note(String value) {
         TextView note = new TextView(this); note.setText(value); note.setTextColor(muted); note.setTextSize(13);
         note.setPadding(dp(16), dp(10), dp(16), dp(16)); note.setLineSpacing(dp(2), 1f);
         content.addView(note, new LinearLayout.LayoutParams(-1, -2));
     }
-    private void refreshRow(Switch control) {
+    protected void refreshRow(Switch control) {
         if (control.getParent() instanceof ToggleRow) ((ToggleRow)control.getParent()).refresh();
     }
     private static int themeColor(String key, int fallback) {
@@ -271,31 +221,14 @@ public final class FamilyPrivacyActivity extends FamilyUi {
         }
         return toward;
     }
-    private void item(String flag, int title, int description) {
-        Switch view = toggle(title, description); controls.put(flag, view);
-        view.setOnCheckedChangeListener((v, checked) -> {
-            if (updating) return;
-            if (!setFlag(flag, flag.equals("sendOfflinePacketAfterOnline") ? checked : !checked)) error();
-            update();
-        });
+    protected TextView actionRow(String title, String detail, View.OnClickListener action) {
+        LinearLayout row = new LinearLayout(this); row.setOrientation(LinearLayout.VERTICAL);
+        row.setMinimumHeight(dp(64)); row.setPadding(dp(16), dp(12), dp(16), dp(12));
+        row.setBackground(new RippleDrawable(ColorStateList.valueOf(rippleColor), new ColorDrawable(rowColor), null));
+        TextView label = new TextView(this); label.setText(title); label.setTextColor(ink); label.setTextSize(16);
+        row.addView(label, new LinearLayout.LayoutParams(-1,-2));
+        TextView value = new TextView(this); value.setText(detail); value.setTextColor(muted); value.setTextSize(13);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1,-2); params.topMargin=dp(4); row.addView(value,params);
+        row.setOnClickListener(action); row.setFocusable(true); content.addView(row,new LinearLayout.LayoutParams(-1,-2)); return value;
     }
-    private void update() {
-        updating = true; boolean all = true;
-        for (String flag : FLAGS) {
-            Boolean value = flag(flag);
-            boolean hidden = value != null && (flag.equals("sendOfflinePacketAfterOnline") ? value : !value);
-            Switch control = controls.get(flag); control.setEnabled(value != null); control.setChecked(hidden); all &= hidden;
-            refreshRow(control);
-        }
-        master.setChecked(all); refreshRow(master); updating = false;
-    }
-    public static Boolean flag(String name) {
-        try { Object item = Class.forName("tw.nekomimi.nekogram.NekoConfig").getField(name).get(null); return (Boolean)item.getClass().getMethod("Bool").invoke(item); }
-        catch (Exception failure) { return null; }
-    }
-    public static boolean setFlag(String name, boolean value) {
-        try { Object item = Class.forName("tw.nekomimi.nekogram.NekoConfig").getField(name).get(null); item.getClass().getMethod("setConfigBool", boolean.class).invoke(item, value); return true; }
-        catch (Exception failure) { return false; }
-    }
-    private void error() { Toast.makeText(this, R.string.fg_privacy_error, Toast.LENGTH_LONG).show(); }
 }

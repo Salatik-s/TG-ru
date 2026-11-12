@@ -1,6 +1,6 @@
 <resources>
  <string name="fg_transcription_title">Расшифровка записи</string>
- <string name="fg_transcription_menu">Расшифровать на телефоне</string>
+ <string name="fg_transcription_menu">Расшифровать</string>
  <string name="fg_transcription_intro">Системное распознавание на этом телефоне. Запись не отправляется на сервер. Telegram Premium не нужен; текст не отправится в чат.</string>
  <string name="fg_transcription_limit">До 5 минут и 16 МБ. Для выбранного языка должна быть установлена системная модель распознавания.</string>
  <string name="fg_transcription_start">Расшифровать</string>

@@ -56,7 +56,7 @@ public final class FamilyLocalTranscriber {
                 check();if(!eligible(message))throw new IOException("audio_input_limit");
                 if(!FamilySystemSpeech.isAvailable(context))throw new IOException("ON_DEVICE_UNAVAILABLE");
                 String provider=FamilySystemSpeech.providerKey(context);android.content.SharedPreferences prefs=context.getSharedPreferences("saa_system_speech_v1",0);
-                boolean verified=FamilySystemSpeech.isVerifiedFileProvider(context)||(provider.equals(prefs.getString("verified_file_provider",""))&&android.os.Build.FINGERPRINT.equals(prefs.getString("verified_build","")));
+                boolean verified=FamilySystemSpeech.isFileProviderVerified(context);
                 if(!verified)throw new IOException("FILE_SOURCE_UNVERIFIED");
                 state("downloading");Object owner=field(message,"messageOwner"),document=message.getClass().getMethod("getDocument").invoke(message);
                 Class<?> loaderType=Class.forName("org.telegram.messenger.FileLoader");Object loader=loaderType.getMethod("getInstance",int.class).invoke(null,account);

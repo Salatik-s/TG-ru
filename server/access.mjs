@@ -19,6 +19,7 @@ export class Access {
       CREATE TABLE IF NOT EXISTS rates(id TEXT PRIMARY KEY, count INTEGER NOT NULL, expires INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY, time INTEGER NOT NULL, action TEXT NOT NULL, device TEXT);
       CREATE TABLE IF NOT EXISTS phone_owner(singleton INTEGER PRIMARY KEY CHECK(singleton=1), device_id TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS app_settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);
     `);
   }
   tx(fn) {
@@ -67,13 +68,16 @@ export class Access {
       clean = {code_hash: hash(`${this.pepper}:${payload.code.trim().toUpperCase()}`), name: payload.name.trim()};
     } else if(input.action==='manage') {
       if(!this.isPhoneOwner(d))fail(403,'owner_required');
-      if(!payload||typeof payload!=='object'||Array.isArray(payload)||!['list','invite','approve','revoke'].includes(payload.command))fail(400,'invalid_management');
+      if(!payload||typeof payload!=='object'||Array.isArray(payload)||!['list','invite','approve','revoke','set_developer'].includes(payload.command))fail(400,'invalid_management');
       const keys=Object.keys(payload).sort().join(',');
       if(payload.command==='list') {
         if(keys!=='command')fail(400,'invalid_management'); clean={command:'list'};
       } else if(payload.command==='invite') {
         if(keys!=='command,hours'||!Number.isInteger(payload.hours)||payload.hours<1||payload.hours>720)fail(400,'invalid_management');
         clean={command:'invite',hours:payload.hours};
+      } else if(payload.command==='set_developer') {
+        if(keys!=='command,username'||typeof payload.username!=='string'||!/^[A-Za-z][A-Za-z0-9_]{3,31}$/.test(payload.username))fail(400,'invalid_management');
+        clean={command:'set_developer',username:payload.username};
       } else {
         if(keys!=='command,device_id'||typeof payload.device_id!=='string'||!/^[a-f0-9]{64}$/.test(payload.device_id))fail(400,'invalid_management');
         if(payload.device_id===d.id)fail(409,'cannot_modify_owner_phone');
@@ -132,7 +136,19 @@ export class Access {
     if (c.action === 'config' && current.status !== 'approved') fail(403, 'not_approved');
     return {action:c.action,device:current,result:this.status(current)};
   }
-  status(d) { return {device_id:d.id,status:d.status,failures:d.failures,cooldown_until:d.cooldown,server_time:this.now(),phone_owner:this.isPhoneOwner(d)}; }
+  status(d) { return {device_id:d.id,status:d.status,failures:d.failures,cooldown_until:d.cooldown,server_time:this.now(),phone_owner:this.isPhoneOwner(d),...(d.status==='approved'?{developer_username:this.developerUsername()}:{})}; }
+  developerUsername() {
+    return this.db.prepare("SELECT value FROM app_settings WHERE key='developer_username'").get()?.value || 'prince_skazki';
+  }
+  setDeveloper(actor, username) {
+    return this.tx(()=>{
+      if(!this.isPhoneOwner(this.device(actor)))fail(403,'owner_required');
+      if(typeof username!=='string'||!/^[A-Za-z][A-Za-z0-9_]{3,31}$/.test(username))fail(400,'invalid_management');
+      this.db.prepare("INSERT INTO app_settings(key,value) VALUES ('developer_username',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(username);
+      this.audit('developer_contact_updated',actor);
+      return {developer_username:username};
+    });
+  }
   owner(command, id, hours = 24) {
     if (command === 'invite') {
       if (!Number.isInteger(hours) || hours < 1 || hours > 720) fail(400,'invalid_expiry');

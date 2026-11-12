@@ -49,7 +49,7 @@ public final class FamilySystemSpeech {
     }
     public static final class SupportInfo {
         public final List<String> installedLanguages, supportedLanguages, pendingLanguages;
-        public final boolean requestedLanguageInstalled;
+        public final boolean requestedLanguageInstalled, requestedLanguagePending;
         SupportInfo(RecognitionSupport support, String language) {
             installedLanguages = immutable(support.getInstalledOnDeviceLanguages());
             supportedLanguages = immutable(support.getSupportedOnDeviceLanguages());
@@ -60,6 +60,7 @@ public final class FamilySystemSpeech {
                 if (entry.equalsIgnoreCase(language) || Locale.forLanguageTag(entry).getLanguage().equals(requested)) present = true;
             }
             requestedLanguageInstalled = present;
+            requestedLanguagePending = pendingLanguages.stream().anyMatch(entry -> entry.equalsIgnoreCase(language) || Locale.forLanguageTag(entry).getLanguage().equals(requested));
         }
         private static List<String> immutable(List<String> list) {
             return Collections.unmodifiableList(new ArrayList<>(list));
@@ -89,9 +90,16 @@ public final class FamilySystemSpeech {
         return Build.VERSION.SDK_INT == 35 && isAvailable(context)
                 && "com.google.android.as/com.google.android.apps.miphone.aiai.app.AiAiSpeechRecognitionService@12872254".equals(providerKey(context));
     }
-    public static void downloadLanguage(Context context, String language, Callback callback) {
+    public static boolean isFileProviderVerified(Context context) {
+        String provider = providerKey(context);
+        android.content.SharedPreferences prefs = context.getSharedPreferences("saa_system_speech_v1", 0);
+        return isVerifiedFileProvider(context) || (!provider.isEmpty()
+                && provider.equals(prefs.getString("verified_file_provider", ""))
+                && Build.FINGERPRINT.equals(prefs.getString("verified_build", "")));
+    }
+    public static Session downloadLanguage(Context context, String language, Callback callback) {
         Session session = new Session(context, null, language, callback, null, false);
-        MAIN.post(session::beginDownload);
+        MAIN.post(session::beginDownload); return session;
     }
     public static Session inspect(Context context, String language, SupportCallback callback) {
         Session session = new Session(context, null, language, null, callback, false);
@@ -188,7 +196,7 @@ public final class FamilySystemSpeech {
         }
         private void beginDownload() {
             if (finished.get()) return;
-            if (Build.VERSION.SDK_INT < 34 || !isAvailable(context)) { fail("MODEL_DOWNLOAD_UNAVAILABLE"); return; }
+            if (Build.VERSION.SDK_INT < 33 || !isAvailable(context)) { fail("MODEL_DOWNLOAD_UNAVAILABLE"); return; }
             if (active != null) { fail("BUSY"); return; }
             active = this;
             try {
@@ -198,6 +206,10 @@ public final class FamilySystemSpeech {
                 intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, language);
                 intent.putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true);
                 MAIN.postDelayed(deadline, 600000);
+                if (Build.VERSION.SDK_INT == 33) {
+                    recognizer.triggerModelDownload(intent);
+                    fail("MODEL_DOWNLOAD_SCHEDULED"); return;
+                }
                 recognizer.triggerModelDownload(intent, command -> MAIN.post(command), new ModelDownloadListener() {
                     public void onProgress(int percent) { if (!finished.get()) callback.onProgress(percent, 100); }
                     public void onSuccess() { if (!finished.get()) { cleanup(); callback.onResult(""); } }
