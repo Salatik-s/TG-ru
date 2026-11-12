@@ -12,6 +12,7 @@ public final class FamilyBinarySettings {
     public static final int ROW_ID = -44001, PRIVACY_ID = -44002, PLUGINS_ID = -44003, DEVICES_ID = -44004;
     private static final int CONTACT_ID = -44005, CONTACT_EDIT_ID = -44006;
     private static final int BACKGROUND_ID = -44007, UPDATE_ID = -44008, HEADER_ID = -44009;
+    private static final int CONNECTION_ID = -44010;
 
     private FamilyBinarySettings() { }
 
@@ -33,6 +34,7 @@ public final class FamilyBinarySettings {
                 if (id == -1 || id == 100) items.remove(i);
             }
             position = Math.min(position, items.size());
+            items.add(position++, row(activity, CONNECTION_ID, "msg_proxy", R.string.fg_connection, R.string.fg_route_settings_summary));
             items.add(position++, row(activity, HEADER_ID, "msg_theme", "Заголовок чатов",
                     "Выбрать текст в шапке"));
             items.add(position++, row(activity, PRIVACY_ID, "ayu_ghost", R.string.fg_ghost_settings_title, R.string.fg_privacy_summary));
@@ -96,7 +98,7 @@ public final class FamilyBinarySettings {
             if (item == null) return false;
             int id = item.getClass().getField("id").getInt(item);
             Class<?> destination;
-            if (id == ROW_ID) destination = FamilySettingsActivity.class;
+            if (id == ROW_ID || id == CONNECTION_ID) destination = FamilySettingsActivity.class;
             else if (id == PRIVACY_ID) destination = FamilyPrivacyActivity.class;
             else if (id == PLUGINS_ID) destination = FamilyPluginsActivity.class;
             else if (id == DEVICES_ID) destination = FamilyDevicesActivity.class;
@@ -104,6 +106,11 @@ public final class FamilyBinarySettings {
             else return false;
             Activity activity = (Activity)fragment.getClass().getMethod("getParentActivity").invoke(fragment);
             if (activity == null) return true;
+            if (id == CONNECTION_ID) {
+                activity.startActivity(new Intent(activity, FamilySettingsActivity.class)
+                        .putExtra(FamilySettingsActivity.EXTRA_CONNECTION, true));
+                return true;
+            }
             if (!FamilyAccess.isAllowed()) { FamilyBinaryGuard.redirect(activity); return true; }
             if (id == CONTACT_ID) FamilyDeveloperContact.open(activity);
             else if (id == CONTACT_EDIT_ID) {

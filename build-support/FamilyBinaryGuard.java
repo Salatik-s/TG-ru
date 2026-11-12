@@ -65,7 +65,11 @@ public final class FamilyBinaryGuard implements Application.ActivityLifecycleCal
         else if (activity.getClass().getName().equals(LAUNCHER)) {
             FamilyAccess.resumeConnection();
             FamilyFeatures.ensureDefaults(activity);
-            activity.getWindow().getDecorView().post(FamilyBinaryGuard::refreshConnectionHeader);
+            activity.getWindow().getDecorView().post(() -> {
+                if (foreground.get() != activity) return;
+                refreshConnectionHeader();
+                FamilyRouteConsent.maybeAsk(activity);
+            });
         }
     }
     @Override public void onActivityPaused(Activity activity) {

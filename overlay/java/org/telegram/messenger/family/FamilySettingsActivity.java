@@ -3,16 +3,26 @@ package org.telegram.messenger.family;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
+import android.widget.Switch;
 import android.widget.TextView;
 
 import org.telegram.messenger.R;
 
-public final class FamilySettingsActivity extends FamilyUi implements FamilyAccess.Listener {
+public final class FamilySettingsActivity extends FamilySettingsPage implements FamilyAccess.Listener {
+    static final String EXTRA_CONNECTION = "tg_ru_connection_settings";
     private TextView connection, detail, feedback, fingerprint;
     private Button reconnect, refresh, copyFingerprint;
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
+        if (getIntent().getBooleanExtra(EXTRA_CONNECTION, false)) {
+            setTitle(R.string.fg_connection);
+            createSettingsLayout(R.string.fg_connection);
+            Switch automatic = toggle(R.string.fg_route_title, R.string.fg_route_explanation);
+            automatic.setChecked(FamilyAccess.routeFailoverEnabled());
+            automatic.setOnCheckedChangeListener((button, checked) -> FamilyAccess.setRouteFailoverEnabled(checked));
+            return;
+        }
         setTitle(R.string.fg_system_title);
         settingsNavigation(R.string.fg_system_title);
         paragraph(R.string.fg_system_intro);
@@ -74,8 +84,8 @@ public final class FamilySettingsActivity extends FamilyUi implements FamilyAcce
             android.widget.Toast.makeText(this, "Журнал скопирован", android.widget.Toast.LENGTH_SHORT).show();
         });
     }
-    @Override protected void onStart() { super.onStart(); FamilyAccess.addListener(this); }
-    @Override protected void onStop() { FamilyAccess.removeListener(this); super.onStop(); }
+    @Override protected void onStart() { super.onStart(); if (connection != null) FamilyAccess.addListener(this); }
+    @Override protected void onStop() { if (connection != null) FamilyAccess.removeListener(this); super.onStop(); }
     @Override public void onFamilyAccessChanged(FamilyAccess.Snapshot state) {
         connection.setText(statusTitle(state));
         detail.setText(FamilyAccess.isAllowed() ? R.string.fg_live_tunnel_active : R.string.fg_live_no_tunnel);
