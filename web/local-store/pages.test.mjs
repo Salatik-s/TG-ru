@@ -36,6 +36,15 @@ test('Store registration, trial and support use server-rendered forms', async (t
   assert.match(home, /id="editor-plans"[\s\S]*<h4>DEMO SECRET<\/h4>[\s\S]*<h4>SECRET<\/h4>[\s\S]*<h4>SECRET\+<\/h4>[\s\S]*CUSTOM/);
   assert.match(home, /href="\/checkout\?plan=pro">Выбрать PRO<\/a>/);
   assert.match(home, /На DEMO можно подключить два устройства, на START — три, на PRO — четыре/);
+  const gatewayCards = home.split('id="gateway-plans"')[1].split('id="editor-plans"')[0];
+  const features = /Расшифровка голосовых и кружочков[\s\S]*Просмотр PDF, Word, TXT и CSV \(экспорт из Excel\)[\s\S]*Запуск Python прямо в чате[\s\S]*Установка дополнительных плагинов/;
+  const [demoCard, startCard, proCard] = gatewayCards.split('<article ').slice(1);
+  assert.match(demoCard, features);
+  assert.match(startCard, features);
+  assert.match(proCard, /Всё то же, что и в START[\s\S]*До 4 устройств[\s\S]*Оплата за 90 дней/);
+  assert.doesNotMatch(proCard, features);
+  assert.match(home, /href="https:\/\/t\.me\/prince_skazki">Написать разработчику<\/a>/);
+  assert.doesNotMatch(home, /class="[^"]*plan-tools/);
   assert.match(home, /DEMO SECRET на 30 минут будет действовать то же/);
   assert.match(await (await fetch(base + '/terms')).text(), /id="trial-conditions"[\s\S]*открытый ключ установки/);
   const proCheckout = await (await fetch(base + '/checkout?plan=pro')).text();

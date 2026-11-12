@@ -119,14 +119,20 @@ function layout(title, content, { session, route, marketing = false, ownerView =
 function pricing(session, accountPath) {
   const gateway = 'Шлюз TG-ru';
   const editor = 'Онлайн-редактор TXT, Word, PDF, Excel';
+  const tools = [
+    'Расшифровка голосовых и кружочков',
+    'Просмотр PDF, Word, TXT и CSV (экспорт из Excel)',
+    'Запуск Python прямо в чате',
+    'Установка дополнительных плагинов',
+  ];
   const plans = [
-    { name: 'DEMO', price: '0 ₽', term: 'на 5 часов', points: [gateway, 'До 2 устройств', 'Оплата не нужна'],
+    { name: 'DEMO', price: '0 ₽', term: 'на 5 часов', points: [gateway, ...tools, 'До 2 устройств', 'Оплата не нужна'],
       button: action(accountPath, 'Попробовать DEMO') },
-    { name: 'START', price: '199 ₽', term: 'в месяц', points: [gateway, 'До 3 устройств', 'Без автоматического списания'],
+    { name: 'START', price: '199 ₽', term: 'в месяц', points: [gateway, ...tools, 'До 3 устройств', 'Без автоматического списания'],
       button: session.account ? action('/checkout', 'Получить доступ', 'primary') : action('/register', 'Создать аккаунт', 'primary') },
     { name: 'PRO', price: '500 ₽', term: 'за 3 месяца', highlight: 'gateway', badge: 'Выгодно: −16%',
       previous: '597 ₽ при оплате START три раза', saving: '167 ₽ в месяц вместо 199 ₽ · экономия 97 ₽',
-      points: ['Всё из START', 'До 4 устройств', 'Оплата за 90 дней'],
+      points: ['Всё то же, что и в START', 'До 4 устройств', 'Оплата за 90 дней'],
       button: action('/checkout?plan=pro', 'Выбрать PRO', 'primary') },
   ];
   const editorPlans = [
@@ -166,7 +172,7 @@ function pricing(session, accountPath) {
   <article class="price-panel plan-custom">
     <div><h3>CUSTOM</h3><strong>Цена договорная</strong>
     <p>Свои настройки, количество устройств и лимиты обсуждаются с владельцем сервиса.</p></div>
-    ${action(supportLink, 'Написать владельцу')}
+    ${action(supportLink, 'Написать разработчику')}
   </article>
 </section>`;
 }
@@ -212,6 +218,7 @@ ${pricing(session, accountPath)}
     <details><summary>Зачем два аккаунта?</summary><p>Кабинет TG-ru управляет доступом к VPN-шлюзу. В свой аккаунт Telegram вы входите отдельно, в приложении.</p></details>
     <details><summary>Что будет, когда подписка закончится?</summary><p>Приложение предложит продлить доступ. Данные Telegram на телефоне сохранятся.</p></details>
     <details><summary>Сколько устройств можно подключить?</summary><p>На DEMO можно подключить два устройства, на START — три, на PRO — четыре.</p></details>
+    <details><summary>Как работает расшифровка голосовых и кружочков?</summary><p>Текст открывается под записью в чате. В настройках можно выбрать Telegram Premium или локальное распознавание, если его поддерживает Android на вашем телефоне.</p></details>
   </div>
 </section>`, { session, route: '/', marketing: true });
 }
