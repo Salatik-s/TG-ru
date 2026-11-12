@@ -59,6 +59,12 @@ const errorMessages = {
   trial_unavailable: 'Бесплатная проба уже использована или недоступна для этого аккаунта.',
   invalid_request: 'Проверьте данные и повторите.',
   device_not_found: 'Устройство уже отвязано.',
+  owner_credentials: 'Проверьте логин, пароль и код. Если код уже использовали, дождитесь нового.',
+  owner_unavailable: 'Вход владельца ещё не настроен.',
+  invalid_duration: 'Укажите срок от 1 до 365 дней.',
+  invalid_plan: 'Выберите START или PRO.',
+  account_not_found: 'Аккаунт с таким логином не найден.',
+  confirm_revoke: 'Подтвердите отзыв доступа.',
 };
 
 function errorNotice(error) {
@@ -66,7 +72,7 @@ function errorNotice(error) {
   return `<p class="notice error" role="alert" tabindex="-1">${icon('info')}${escapeHtml(errorMessages[error] ?? 'Не удалось выполнить действие. Проверьте данные и повторите.')}</p>`;
 }
 
-function layout(title, content, { session, route, marketing = false } = {}) {
+function layout(title, content, { session, route, marketing = false, ownerView = false } = {}) {
   const account = session?.account;
   const navLink = (href, name) => `<a href="${href}"${route === href ? ' aria-current="page"' : ''}>${name}</a>`;
   const nav = marketing || !account
@@ -84,7 +90,7 @@ function layout(title, content, { session, route, marketing = false } = {}) {
   <meta name="color-scheme" content="dark">
   <title>${escapeHtml(title)} · TG-ru</title>
   <link rel="icon" type="image/png" sizes="32x32" href="${favicon}">
-  <script src="/store.mjs"></script>
+  ${ownerView ? '' : '<script src="/store.mjs"></script>'}
   <link rel="stylesheet" href="/store.css">
 </head>
 <body>
@@ -92,8 +98,7 @@ function layout(title, content, { session, route, marketing = false } = {}) {
   <header class="site-header">
     <div class="wrap topbar">
       <a class="brand" href="/" aria-label="TG-ru, главная"><span class="brand-icon" aria-hidden="true">TG</span>TG-ru</a>
-      <nav aria-label="Основная навигация">${nav}</nav>
-      <div class="session-links">${sessionLinks}</div>
+      ${ownerView ? '' : `<nav aria-label="Основная навигация">${nav}</nav><div class="session-links">${sessionLinks}</div>`}
     </div>
   </header>
   <main id="content" tabindex="-1">${content}</main>
@@ -151,10 +156,12 @@ function pricing(session, accountPath) {
   <section class="plan-group" aria-labelledby="gateway-plans">
     <div class="plan-group-header"><h3 id="gateway-plans">Доступ к шлюзу</h3></div>
     <div class="price-grid">${plans.map(card).join('')}</div>
+    <p class="trial-note">При активации DEMO мы регистрируем установку приложения. <a href="/terms#trial-conditions">Условия бесплатного доступа</a></p>
   </section>
   <section class="plan-group plan-group-editor" aria-labelledby="editor-plans">
     <div class="plan-group-header"><h3 id="editor-plans">Онлайн-редактор файлов</h3><p>В разработке</p></div>
     <div class="price-grid">${editorPlans.map(card).join('')}</div>
+    <p class="trial-note">После запуска DEMO SECRET на 30 минут будет действовать то же <a href="/terms#trial-conditions">условие для устройств</a>.</p>
   </section>
   <article class="price-panel plan-custom">
     <div><h3>CUSTOM</h3><strong>Цена договорная</strong>
@@ -289,7 +296,7 @@ function status(session, now, access) {
       <div class="actions">${session.account.plan === 'pro' ? action('/checkout?plan=pro', 'Продлить на 90 дней', 'primary') : action('/checkout', 'Продлить на 30 дней', 'primary')}${action('/#price', 'Сменить тариф')}</div>`;
   }
   if (access.trialAvailable) {
-    return `<h2 class="access-title">Начните с 5 часов бесплатно</h2><p>Пробный период начнётся сразу после нажатия. Карта не нужна.</p>
+    return `<h2 class="access-title">Начните с 5 часов бесплатно</h2><p>Пробный период начнётся сразу после нажатия. При активации приложения устройство появится в кабинете. <a href="/terms#trial-conditions">Условия пробы</a></p>
       <div class="actions"><form method="post" action="/form/trial">${csrf(session)}${formButton('Попробовать 5 часов бесплатно')}</form>
       ${action('/checkout', 'Получить доступ')}</div>`;
   }
@@ -381,6 +388,8 @@ ${visibilitySummary()}
 <ul><li>Пробный доступ действует 5 часов с момента запуска. Он доступен один раз на аккаунт, рассчитан на два устройства и не требует банковской карты.</li>
 <li>START стоит 199 ₽ за 30 дней и даёт доступ на трёх устройствах. PRO стоит 500 ₽ за 90 дней и поддерживает четыре устройства. Чтобы подключить тариф, напишите в поддержку. Автоматических списаний нет. Редактор файлов в разработке.</li>
 <li>После окончания срока шлюз перестаёт принимать подключения этого аккаунта. Оставшееся время и привязанные устройства отображаются в кабинете.</li></ul>
+<h2 id="trial-conditions">Данные устройства при бесплатном доступе</h2>
+<p>Для DEMO на 5 часов мы записываем название устройства, идентификатор и открытый ключ установки, а также даты привязки и отвязки. До перехода на платный тариф эти данные помогают соблюдать лимит устройств и выявлять повторные активации одной установки. После смены тарифа привязка нужна для работы шлюза и управления устройствами в кабинете. Для DEMO SECRET на 30 минут это условие будет действовать после запуска тарифа. <a href="/privacy">Политика конфиденциальности</a></p>
 <h2>Подключение и правила пользования</h2>
 <p>Создайте аккаунт, сохраните код восстановления, запустите пробу или получите доступ через поддержку и активируйте устройство. В кабинете можно отвязать телефон. Запрещено использовать шлюз для спама, атак, неправомерного доступа и других действий, нарушающих применимые правила.</p>
 <h2>Платежи и обращения</h2>
@@ -466,8 +475,122 @@ async function formData(request) {
   return Object.fromEntries(new URLSearchParams(Buffer.concat(buffers).toString('utf8')));
 }
 
-export async function handleStorePages(request, response, { getSession, submit, release }) {
+const ownerPath = '/form/owner/';
+
+function ownerLogin(error) {
+  return layout('Вход владельца', `
+    <section class="wrap form-page">
+      <form class="form-card" method="post" action="${ownerPath}login">
+        <div class="form-intro"><h1>Вход владельца</h1><p>Введите данные владельца и код из приложения-аутентификатора.</p></div>
+        ${errorNotice(error)}
+        <div class="field"><label for="owner-login">Логин</label><input id="owner-login" name="login" autocomplete="username" required maxlength="24"></div>
+        <div class="field"><label for="owner-password">Пароль</label><input id="owner-password" name="password" type="password" autocomplete="current-password" required maxlength="256"></div>
+        <div class="field"><label for="owner-otp">Одноразовый код</label><input id="owner-otp" name="otp" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required></div>
+        ${formButton('Войти в кабинет владельца')}
+      </form>
+    </section>`, { ownerView: true });
+}
+
+function ownerPlanFields(id, plan = 'start') {
+  return `<div class="owner-fields">
+    <div class="field"><label for="${id}-plan">Тариф</label><select id="${id}-plan" name="plan">
+      <option value="start">START</option><option value="pro"${plan === 'pro' ? ' selected' : ''}>PRO</option>
+    </select></div>
+    <div class="field"><label for="${id}-days">Срок в днях</label><input id="${id}-days" name="days" type="number" min="1" max="365" value="${plan === 'pro' ? 90 : 30}" required></div>
+  </div>`;
+}
+
+function ownerAccount(account, session) {
+  const { login, plan, active, access_until, devices, device_limit } = account;
+  const id = 'account-' + login;
+  const status = active ? `${plan?.toUpperCase() ?? 'DEMO'} до ${formatDate(access_until)} (МСК)` : 'Доступа нет';
+  return `<details class="owner-account">
+    <summary><strong>${escapeHtml(login)}</strong><span>${status}</span></summary>
+    <p>Устройства: ${devices.length} из ${device_limit}.</p>
+    <form method="post" action="${ownerPath}grant">
+      ${csrf(session)}${input('login', login)}
+      ${ownerPlanFields(id, plan)}
+      ${formButton(active ? 'Продлить доступ' : 'Выдать доступ')}
+    </form>
+    ${active ? `<form method="post" action="${ownerPath}revoke" class="owner-revoke">
+      ${csrf(session)}${input('login', login)}
+      <label><input type="checkbox" name="confirm" value="yes" required> Отозвать доступ на всех устройствах</label>
+      ${formButton('Отозвать доступ', 'danger')}
+    </form>` : ''}
+  </details>`;
+}
+
+function ownerDashboard(session, search, error, issued) {
+  return layout('Кабинет владельца', `
+    <section class="wrap dashboard">
+      <div class="dashboard-card-heading"><div class="page-heading"><h1>Кабинет владельца</h1><p>Управление доступом к TG-ru</p></div>
+        <form method="post" action="${ownerPath}logout">${csrf(session)}${formButton('Выйти', 'secondary')}</form>
+      </div>
+      ${errorNotice(error)}
+      ${issued ? `<section class="dashboard-card owner-issued"><h2>Аккаунт создан</h2><p>Сохраните эти данные и передайте их пользователю. Пароль и код восстановления показаны один раз.</p>
+        <dl><dt>Логин</dt><dd><code>${escapeHtml(issued.login)}</code></dd>
+        <dt>Пароль</dt><dd><code>${escapeHtml(issued.password)}</code></dd>
+        <dt>Код восстановления</dt><dd><code>${escapeHtml(issued.recoveryCode)}</code></dd></dl>
+      </section>` : ''}
+      <div class="owner-grid">
+        <form class="form-card" method="post" action="${ownerPath}create">
+          <div class="form-intro"><h2>Создать аккаунт</h2><p>Доступ начнёт действовать сразу.</p></div>
+          ${csrf(session)}
+          <div class="field"><label for="new-login">Логин</label><input id="new-login" name="login" required minlength="3" maxlength="24" pattern="[a-zA-Z0-9_]{3,24}" autocomplete="off" spellcheck="false"></div>
+          <div class="field"><label for="new-password">Пароль</label><input id="new-password" name="password" type="password" autocomplete="new-password" minlength="12" maxlength="256" placeholder="Создать автоматически"></div>
+          ${ownerPlanFields('new')}
+          ${formButton('Создать и выдать доступ')}
+        </form>
+        <section class="dashboard-card owner-list">
+          <h2>Аккаунты</h2>
+          <form class="owner-fields" method="get" action="${ownerPath}cabinet">
+            <div class="field"><label for="owner-search">Поиск по логину</label><input id="owner-search" name="search" type="search" maxlength="24" value="${escapeHtml(search)}"></div>
+            ${formButton('Найти', 'secondary')}
+          </form>
+          ${session.accounts.length ? session.accounts.map(account => ownerAccount(account, session)).join('') : '<p>Аккаунты не найдены.</p>'}
+          ${session.more ? '<p>Показаны первые 50 аккаунтов. Уточните поиск, чтобы найти нужный.</p>' : ''}
+        </section>
+      </div>
+    </section>`, { ownerView: true });
+}
+
+async function handleOwnerPage(request, response, url, owner) {
+  const html = (body, status = 200) => respond(response, status, 'text/html; charset=utf-8', body, request.method === 'HEAD');
+  if (request.method === 'GET' || request.method === 'HEAD') {
+    if (owner.route === 'login') {
+      if (owner.session) redirect(response, ownerPath + 'cabinet');
+      else html(ownerLogin());
+    } else if (owner.route === 'cabinet') {
+      const search = url.searchParams.get('search') ?? '';
+      html(ownerDashboard(owner.list(search), search));
+    } else return false;
+    return true;
+  }
+  if (request.method !== 'POST' || !['login', 'logout', 'create', 'grant', 'revoke'].includes(owner.route)) return false;
+  const data = await formData(request);
+  const search = /^[A-Za-z0-9_]{3,24}$/.test(data?.login ?? '') ? data.login : '';
+  try {
+    if (!data) {
+      if (owner.route === 'login') html(ownerLogin('invalid_request'), 400);
+      else html(ownerDashboard(owner.list(''), '', 'invalid_request'), 400);
+      return true;
+    }
+    const result = await owner.submit(data);
+    if (result.issued) html(ownerDashboard(owner.list(result.login), result.login, '', result.issued), 201);
+    else if (owner.route === 'logout') redirect(response, ownerPath + 'login');
+    else redirect(response, ownerPath + 'cabinet' + (result.login ? '?search=' + encodeURIComponent(result.login) : ''));
+  } catch (error) {
+    const status = error.status ?? 500;
+    if (owner.route === 'login') html(ownerLogin(error.code ?? 'internal_error'), status);
+    else if (error.code === 'owner_required') redirect(response, ownerPath + 'login');
+    else html(ownerDashboard(owner.list(search), search, error.code ?? 'internal_error'), status);
+  }
+  return true;
+}
+
+export async function handleStorePages(request, response, { getSession, submit, release, owner }) {
   const url = new URL(request.url, 'http://localhost');
+  if (owner) return handleOwnerPage(request, response, url, owner);
   const route = url.pathname;
   const asset = staticFiles.get(route);
   const pageRequest = request.method === 'GET' || request.method === 'HEAD';

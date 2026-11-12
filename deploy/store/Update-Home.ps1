@@ -4,13 +4,14 @@ param(
     [string]$SshTarget = 'root@157.228.191.231',
     [ValidatePattern('\Ademo_start_[a-f0-9]{8}\z')]
     [string]$DemoStartLogin,
+    [switch]$InitializeOwner,
     [switch]$PlanOnly
 )
 
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $files = @('deploy/store/update-home.sh','web/local-store/pages.mjs','web/local-store/store.css','web/local-store/store.mjs',
-    'i18n/ru.json','local-store/store.mjs','local-store/owner.mjs')
+    'i18n/ru.json','local-store/store.mjs','local-store/http.mjs','local-store/owner.mjs','local-store/owner-auth.mjs')
 & node --test (Join-Path $repo 'web/local-store/pages.test.mjs') (Join-Path $repo 'local-store/store.test.mjs')
 if ($LASTEXITCODE -ne 0) { throw 'Store page tests failed.' }
 if ($PlanOnly) { return }
@@ -28,6 +29,9 @@ try {
     if ($DemoStartLogin) {
         $command += "; docker exec tg-ru-store-web-1 node local-store/owner.mjs grant '$DemoStartLogin' 30 --reason test --if-inactive || { echo 'Website updated; START demo grant failed.' >&2; exit 1; }"
     }
+    if ($InitializeOwner) {
+        $command += "; docker exec tg-ru-store-web-1 node local-store/owner.mjs initialize-web || { echo 'Website updated; owner initialization failed.' >&2; exit 1; }"
+    }
     & ssh.exe -t -- $SshTarget $command
     if ($LASTEXITCODE -ne 0) { throw 'Store homepage update failed. See the rollback diagnostics above.' }
     $page = & curl.exe -fsS --max-time 12 'https://tg.24projects.ru/'
@@ -35,6 +39,7 @@ try {
         throw 'The new Store homepage could not be verified from this PC.'
     }
     Write-Host 'The updated homepage is reachable publicly. Only the Store web container was restarted.'
+    if ($InitializeOwner) { Write-Host 'Owner sign-in: https://tg.24projects.ru/form/owner/login' }
 } finally {
     if (Test-Path -LiteralPath $archive -PathType Leaf) { Remove-Item -LiteralPath $archive -Force }
 }

@@ -3,20 +3,21 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { createStore, StoreError } from './store.mjs';
 
 const SESSION_COOKIE = '__Host-tgru_store_local';
+const OWNER_COOKIE = '__Host-tgru_owner';
 const MAX_BODY = 8192;
 const DOWNLOAD_PATH = '/downloads/TG-ru.apk';
 const TICKET_TTL = 15 * 60;
 const WEB_ACTIONS = new Set(['register', 'login', 'recover', 'logout', 'trial', 'mock-purchase', 'devices/revoke']);
 const DEVICE_ACTIONS = new Set(['activation-token', 'activate', 'device/challenge', 'device/renew']);
 
-function cookieValue(request) {
+function cookieValue(request, name = SESSION_COOKIE) {
   const pair = request.headers.cookie?.split(';').map((value) => value.trim())
-    .find((value) => value.startsWith(SESSION_COOKIE + '='));
-  return pair?.slice(SESSION_COOKIE.length + 1);
+    .find((value) => value.startsWith(name + '='));
+  return pair?.slice(name.length + 1);
 }
 
-function writeCookie(response, session) {
-  response.setHeader('Set-Cookie', `${SESSION_COOKIE}=${session.rawToken}; Path=/; Max-Age=${session.duration}; HttpOnly; Secure; SameSite=Strict`);
+function writeCookie(response, session, name = SESSION_COOKIE) {
+  response.setHeader('Set-Cookie', `${name}=${session.rawToken}; Path=/; Max-Age=${session.duration}; HttpOnly; Secure; SameSite=Strict`);
 }
 
 function json(response, status, payload) {
@@ -104,6 +105,35 @@ export function createStoreServer({ pagesHandler, publicOrigin, release, ...stor
       store.purge();
       if (path === '/health' && request.method === 'GET') {
         return json(response, 200, { ok: true, local: true });
+      }
+      if (path.startsWith('/form/owner/')) {
+        response.setHeader('X-Robots-Tag', 'noindex, nofollow');
+        const rawToken = cookieValue(request, OWNER_COOKIE);
+        const session = store.ownerSession(rawToken);
+        const route = path.slice('/form/owner/'.length);
+        if (route !== 'login' && !session) throw new StoreError(403, 'owner_required');
+        if (request.method === 'POST') {
+          const { origin, 'sec-fetch-site': site } = request.headers;
+          if (origin !== url.origin && !(origin === 'null' && site === 'same-origin')) {
+            throw new StoreError(403, 'invalid_origin');
+          }
+        }
+        const owner = {
+          route,
+          session: Boolean(session),
+          list: (search) => store.ownerAccounts(rawToken, search),
+          async submit(data) {
+            if (route === 'login') {
+              writeCookie(response, await store.ownerLogin(data), OWNER_COOKIE);
+              return {};
+            }
+            const result = await store.ownerAction(rawToken, route, data);
+            if (route === 'logout') writeCookie(response, { rawToken: '', duration: 0 }, OWNER_COOKIE);
+            return result;
+          },
+        };
+        if (pagesHandler && await pagesHandler(request, response, { owner })) return;
+        throw new StoreError(404, 'not_found');
       }
 
       let session = store.findSession(cookieValue(request));

@@ -1,8 +1,14 @@
 import assert from 'node:assert/strict';
-import { randomBytes } from 'node:crypto';
+import { generateKeyPairSync, randomBytes, sign } from 'node:crypto';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { request as httpRequest } from 'node:http';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { test } from 'node:test';
 import { createStoreServer } from '../../local-store/http.mjs';
+import { initializeStoreOwner } from '../../local-store/store.mjs';
+import { totpCode } from '../../local-store/owner-auth.mjs';
 import { handleStorePages } from './pages.mjs';
 
 test('Store registration, trial and support use server-rendered forms', async (t) => {
@@ -30,6 +36,8 @@ test('Store registration, trial and support use server-rendered forms', async (t
   assert.match(home, /id="editor-plans"[\s\S]*<h4>DEMO SECRET<\/h4>[\s\S]*<h4>SECRET<\/h4>[\s\S]*<h4>SECRET\+<\/h4>[\s\S]*CUSTOM/);
   assert.match(home, /href="\/checkout\?plan=pro">Выбрать PRO<\/a>/);
   assert.match(home, /На DEMO можно подключить два устройства, на START — три, на PRO — четыре/);
+  assert.match(home, /DEMO SECRET на 30 минут будет действовать то же/);
+  assert.match(await (await fetch(base + '/terms')).text(), /id="trial-conditions"[\s\S]*открытый ключ установки/);
   const proCheckout = await (await fetch(base + '/checkout?plan=pro')).text();
   assert.match(proCheckout, /500 ₽ за 90 дней\. До 4 устройств/);
   const appAccountLink = await fetch(base + '/account', { redirect: 'manual' });
@@ -84,6 +92,126 @@ test('Store registration, trial and support use server-rendered forms', async (t
   assert.doesNotMatch(checkoutBody, /mock-purchase|Тестовая оплата/);
   const removedCheckout = await post('/form/mock-purchase', { csrf: trialToken }, cookie);
   assert.equal(removedCheckout.status, 404);
+});
+
+test('the owner can issue, extend and revoke access with a separate password and single-use TOTP', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'tgru-owner-web-'));
+  const database = join(directory, 'store.sqlite');
+  let now = 1_900_000_000;
+  const server = createStoreServer({ database, pagesHandler: handleStorePages, now: () => now });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const base = 'http://127.0.0.1:' + server.address().port;
+  const ownerPath = '/form/owner/';
+  const get = (path, cookie) => fetch(base + path, { headers: cookie ? { cookie } : {}, redirect: 'manual' });
+  const post = (path, fields, cookie, origin = base) => fetch(base + path, {
+    method: 'POST', headers: { origin, ...(cookie ? { cookie } : {}) },
+    body: new URLSearchParams(fields), redirect: 'manual',
+  });
+  const native = (path, data) => fetch(base + '/api/store/' + path, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(data),
+  });
+  const cookie = response => response.headers.get('set-cookie')?.split(';', 1)[0];
+  const csrf = html => html.match(/name="csrf" value="([^"]+)"/)[1];
+  const data = { login: 'issued_user', password: randomBytes(24).toString('base64url') };
+  try {
+    assert.equal(totpCode(Buffer.from('12345678901234567890'), 1), '287082');
+    const owner = await initializeStoreOwner(database);
+    const stored = new DatabaseSync(database, { readOnly: true });
+    try {
+      const secret = stored.prepare('SELECT totp_key, password_hash FROM store_owner').get();
+      assert.equal(secret.password_hash.length, 32);
+      assert.notDeepEqual(Buffer.from(secret.password_hash), Buffer.from(owner.password));
+      owner.otp = totpCode(secret.totp_key, Math.floor(now / 30));
+    } finally {
+      stored.close();
+    }
+    assert.match(owner.totp, /^[A-Z2-7]{32}$/);
+    const userForm = await get('/register');
+    const ordinary = await post('/form/register', {
+      ...data, login: 'ordinary_user', csrf: csrf(await userForm.text()), accepted_terms: 'yes',
+    }, cookie(userForm));
+    assert.equal(ordinary.status, 201);
+    const ordinaryCookie = cookie(ordinary);
+    const ordinaryCsrf = csrf(await (await get('/cabinet', ordinaryCookie)).text());
+    assert.equal((await get(ownerPath + 'cabinet')).status, 403);
+    assert.equal((await get(ownerPath + 'cabinet', ordinaryCookie)).status, 403);
+    for (const path of ['create', 'grant', 'revoke', 'logout']) {
+      const response = await post(ownerPath + path, { ...data, csrf: ordinaryCsrf, days: 7, plan: 'pro' }, ordinaryCookie);
+      assert.equal(response.status, 403, path);
+      assert.equal((await response.json()).code, 'owner_required');
+    }
+    const login = { login: owner.login, password: owner.password, otp: owner.otp };
+    assert.equal((await post(ownerPath + 'login', login, undefined, 'https://foreign.example')).status, 403);
+    assert.equal((await post(ownerPath + 'login', { ...login, password: data.password })).status, 401);
+    const authenticated = await post(ownerPath + 'login', login, ordinaryCookie);
+    assert.equal(authenticated.status, 303);
+    assert.equal(authenticated.headers.get('location'), ownerPath + 'cabinet');
+    assert.match(authenticated.headers.get('set-cookie'), /^__Host-tgru_owner=.*; HttpOnly; Secure; SameSite=Strict$/);
+    const ownerCookie = cookie(authenticated);
+    assert.equal((await post(ownerPath + 'login', login)).status, 401);
+    assert.equal((await get('/api/store/session', ownerCookie).then(response => response.json())).account, null);
+    const panel = await get(ownerPath + 'cabinet', ownerCookie);
+    assert.equal(panel.status, 200);
+    assert.match(panel.headers.get('cache-control'), /no-store/);
+    const ownerCsrf = csrf(await panel.text());
+    assert.equal((await post(ownerPath + 'create', { ...data, plan: 'start', days: 7, csrf: ordinaryCsrf }, ownerCookie)).status, 403);
+    const created = await post(ownerPath + 'create', { ...data, plan: 'start', days: 7, csrf: ownerCsrf }, ownerCookie);
+    assert.equal(created.status, 201);
+    assert.match(await created.text(), /Аккаунт создан/);
+    const userLogin = await get('/login');
+    const issued = await post('/form/login', { ...data, csrf: csrf(await userLogin.text()) }, cookie(userLogin));
+    assert.equal(issued.status, 303);
+    const account = () => get('/api/store/session', cookie(issued)).then(response => response.json()).then(result => result.account);
+    assert.equal((await account()).plan, 'start');
+    assert.equal((await account()).access_until, now + 7 * 86_400);
+    const dashboard = () => get(ownerPath + 'cabinet?search=issued_user', ownerCookie).then(response => response.text());
+    const initial = await dashboard();
+    assert.doesNotMatch(initial, new RegExp(data.password));
+    const grant = { login: data.login, plan: 'pro', days: 42, csrf: csrf(initial) };
+    assert.equal((await post(ownerPath + 'grant', grant, ownerCookie)).status, 303);
+    assert.equal((await post(ownerPath + 'grant', grant, ownerCookie)).status, 403);
+    assert.equal((await account()).plan, 'pro');
+    assert.equal((await account()).access_until, now + 49 * 86_400);
+    const challenge = await (await native('activation-token', data)).json();
+    const { publicKey, privateKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+    const proof = (challenge) => sign('sha256', Buffer.from('tg-ru-store-local\n' + challenge.challenge), privateKey).toString('base64');
+    const activation = (challenge) => ({
+      token: challenge.token, name: 'Test Android', public_key: publicKey.export({ type: 'spki', format: 'der' }).toString('base64'),
+      signature: proof(challenge),
+    });
+    const admitted = await (await native('activate', activation(challenge))).json();
+    assert.ok(admitted.device_id);
+    const renewal = await (await native('device/challenge', { device_id: admitted.device_id })).json();
+    const revoke = async (confirm) => post(ownerPath + 'revoke', { login: data.login, csrf: csrf(await dashboard()), confirm }, ownerCookie);
+    assert.equal((await revoke('no')).status, 400);
+    assert.equal((await revoke('yes')).status, 303);
+    assert.equal((await account()).active, false);
+    assert.equal((await native('activation-token', data)).status, 403);
+    assert.equal((await native('device/renew', { token: renewal.token, signature: proof(renewal) })).status, 400);
+    const renewed = await (await native('device/challenge', { device_id: admitted.device_id })).json();
+    assert.equal((await native('device/renew', { token: renewed.token, signature: proof(renewed) })).status, 403);
+    const user = await get('/cabinet', cookie(issued));
+    await post('/form/trial', { csrf: csrf(await user.text()) }, cookie(issued));
+    assert.equal((await account()).active, false);
+    const other = await get('/cabinet', ordinaryCookie);
+    await post('/form/trial', { csrf: csrf(await other.text()) }, ordinaryCookie);
+    const otherChallenge = await (await native('activation-token', { ...data, login: 'ordinary_user' })).json();
+    const duplicate = await (await native('activate', activation(otherChallenge))).json();
+    assert.equal(duplicate.code, 'device_linked_elsewhere');
+    const logout = await post(ownerPath + 'logout', { csrf: csrf(await dashboard()) }, ownerCookie);
+    assert.equal(logout.status, 303);
+    assert.equal((await get(ownerPath + 'cabinet', ownerCookie)).status, 403);
+    const audit = new DatabaseSync(database, { readOnly: true });
+    try {
+      assert.deepEqual(audit.prepare('SELECT action FROM store_owner_audit ORDER BY id').all().map(row => row.action),
+        ['create', 'grant', 'revoke']);
+    } finally {
+      audit.close();
+    }
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test('public Store downloads require a matching logged-in session and a fresh single-use ticket', async (t) => {

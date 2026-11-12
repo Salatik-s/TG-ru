@@ -5,7 +5,8 @@ umask 077
 base=/opt/tg-ru-store
 web=tg-ru-store-web-1
 staged=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)
-files=(web/local-store/pages.mjs web/local-store/store.css web/local-store/store.mjs i18n/ru.json local-store/store.mjs local-store/owner.mjs)
+files=(web/local-store/pages.mjs web/local-store/store.css web/local-store/store.mjs i18n/ru.json
+       local-store/store.mjs local-store/http.mjs local-store/owner.mjs local-store/owner-auth.mjs)
 die() { printf '%s\n' "$*" >&2; exit 1; }
 
 [[ $EUID == 0 && -f $base/.owned && $(cat "$base/.owned") == tg-ru-store-v1 ]] ||
@@ -24,8 +25,10 @@ grep -Fxq "$release/local-store /app/local-store" <<< "$mounts" ||
     die 'The Store web container does not use the active Store backend.'
 
 for file in "${files[@]}"; do
-    [[ -s $staged/$file && ! -L $staged/$file && -f $release/$file && ! -L $release/$file ]] ||
-        die "Unexpected frontend file: $file"
+    [[ -s $staged/$file && ! -L $staged/$file && ! -L $release/$file ]] ||
+        die "Unexpected Store file: $file"
+    [[ -f $release/$file || ( $file == local-store/owner-auth.mjs && ! -e $release/$file ) ]] ||
+        die "Unexpected active Store file: $file"
 done
 
 backup=$(mktemp -d /tmp/tg-ru-home-backup.XXXXXXXX)
@@ -34,7 +37,13 @@ restore() {
     status=$?
     trap - EXIT
     if (( status && changed )); then
-        for file in "${files[@]}"; do install -m 0644 "$backup/${file//\//_}" "$release/$file"; done
+        for file in "${files[@]}"; do
+            if [[ -f $backup/${file//\//_} ]]; then
+                install -m 0644 "$backup/${file//\//_}" "$release/$file"
+            else
+                rm -f -- "$release/$file"
+            fi
+        done
         docker restart "$web" >/dev/null || printf '%s\n' 'Store web restart needs review.' >&2
     fi
     for file in "${files[@]}"; do rm -f -- "$backup/${file//\//_}"; done
@@ -51,7 +60,9 @@ site() {
     curl --noproxy '*' --resolve 'tg.24projects.ru:443:127.0.0.1' -fsS --max-time 8 "https://tg.24projects.ru$1"
 }
 site /index.html > "$backup/legacy-before"
-for file in "${files[@]}"; do cp -p -- "$release/$file" "$backup/${file//\//_}"; done
+for file in "${files[@]}"; do
+    if [[ -f $release/$file ]]; then cp -p -- "$release/$file" "$backup/${file//\//_}"; fi
+done
 changed=1
 for file in "${files[@]}"; do
     temp=$(mktemp "$release/$file.home.XXXXXXXX")
@@ -72,7 +83,13 @@ for attempt in {1..20}; do
 done
 (( ready )) || die 'Store homepage did not pass the post-update check.'
 terms=$(site /terms)
-[[ $terms == *'https://telegram.org/tos'* ]] || die 'Store terms page did not pass the post-update check.'
+[[ $terms == *'https://telegram.org/tos'* && $terms == *'id="trial-conditions"'* ]] ||
+    die 'Store terms page did not pass the post-update check.'
+owner_page=$(site /form/owner/login)
+[[ $owner_page == *'autocomplete="one-time-code"'* ]] || die 'Owner login page did not respond.'
+owner_status=$(curl --noproxy '*' --resolve 'tg.24projects.ru:443:127.0.0.1' -sS -o /dev/null -w '%{http_code}' \
+    --max-time 8 'https://tg.24projects.ru/form/owner/cabinet')
+[[ $owner_status == 403 ]] || die 'Owner cabinet did not reject an anonymous request.'
 session=$(site /api/store/session)
 [[ $session == *'"ok":true'* ]] || die 'The Store session API did not respond.'
 site /index.html > "$backup/legacy-after"

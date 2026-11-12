@@ -11,6 +11,7 @@ import {
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { promisify } from 'node:util';
+import { createOwnerAuth, installOwnerSchema, provisionOwner } from './owner-auth.mjs';
 
 const APP_ID = 0x54474c53; // TGLS
 const PRICE_RUB = 199;
@@ -65,6 +66,7 @@ function localDatabase(path) {
       account_id TEXT PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
       expires_at INTEGER NOT NULL CHECK(expires_at > 0)
     ) STRICT`);
+    installOwnerSchema(db);
     db.exec('COMMIT');
     return db;
   } catch (error) {
@@ -151,7 +153,26 @@ function transaction(db, callback) {
   }
 }
 
-/** Invoked by the filesystem-authorized owner console. There is no HTTP action for this. */
+function applyGrant(db, account, { days, plan }, time) {
+  const until = Math.max(time, expiry(account).accessUntil) + days * DAY;
+  db.prepare('UPDATE accounts SET manual_until=? WHERE id=?').run(until, account.id);
+  if (plan === 'pro') {
+    db.prepare('INSERT INTO pro_access VALUES (?,?) ON CONFLICT(account_id) DO UPDATE SET expires_at=excluded.expires_at')
+      .run(account.id, until);
+  }
+  return until;
+}
+
+export async function initializeStoreOwner(database, replace = false) {
+  const db = localDatabase(database);
+  try {
+    return await provisionOwner(db, passwordHash, replace);
+  } finally {
+    db.close();
+  }
+}
+
+/** Invoked by the filesystem-authorized owner console. */
 export function grantStoreAccess({
   database,
   login: input,
@@ -177,13 +198,8 @@ export function grantStoreAccess({
       const { total } = db.prepare('SELECT count(*) AS total FROM manual_grant_audit WHERE granted_at>?')
         .get(time - DAY);
       require(total < 3, 429, 'manual_grant_limit');
-      const until = Math.max(time, accessUntil) + days * DAY;
+      const until = applyGrant(db, account, { days, plan }, time);
       const id = randomUUID();
-      db.prepare('UPDATE accounts SET manual_until=? WHERE id=?').run(until, account.id);
-      if (plan === 'pro') {
-        db.prepare('INSERT INTO pro_access VALUES (?,?) ON CONFLICT(account_id) DO UPDATE SET expires_at=excluded.expires_at')
-          .run(account.id, until);
-      }
       db.prepare(`
         INSERT INTO manual_grant_audit (id, account_id, reason, days, granted_at, expires_at)
         VALUES (?, ?, ?, ?, ?, ?)
@@ -208,6 +224,7 @@ export function createStore({
   const attempts = new Map();
   let hashing = 0;
   let lastPurge = -Infinity;
+  const ownerAuth = createOwnerAuth(db, now, hash, StoreError);
 
   const inTransaction = (callback) => transaction(db, callback);
 
@@ -383,14 +400,82 @@ export function createStore({
     const password = await hash(data.password, salt);
     const recoveryCode = token();
     return inTransaction(() => {
-      require(!accountByLogin(login), 409, 'login_taken');
-      const id = randomUUID();
-      db.prepare(`
-        INSERT INTO accounts (id, login, password_salt, password_hash, recovery_hash, created_at)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `).run(id, login, salt, password, digest(recoveryCode), now());
+      const id = insertAccount(login, salt, password, recoveryCode, now());
       dropSession(session);
       return { session: newSession(id), result: { recovery_code: recoveryCode } };
+    });
+  }
+
+  function insertAccount(login, salt, password, recoveryCode, time) {
+    require(!accountByLogin(login), 409, 'login_taken');
+    const id = randomUUID();
+    db.prepare(`
+      INSERT INTO accounts (id, login, password_salt, password_hash, recovery_hash, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(id, login, salt, password, digest(recoveryCode), time);
+    return id;
+  }
+
+  function ownerAccounts(rawToken, search) {
+    const active = ownerAuth.session(rawToken);
+    require(active, 403, 'owner_required');
+    require(/^[a-zA-Z0-9_]{0,24}$/.test(search), 400, 'invalid_login');
+    const prefix = search.toLowerCase().replaceAll('_', '!_');
+    const rows = db.prepare(`
+      SELECT id FROM accounts WHERE login LIKE ? ESCAPE '!' ORDER BY created_at DESC, login LIMIT 51
+    `).all(prefix + '%');
+    return { csrf: active.csrf, accounts: rows.slice(0, 50).map(({ id }) => publicAccount(id)), more: rows.length > 50 };
+  }
+
+  async function ownerAction(rawToken, action, data) {
+    const active = ownerAuth.authorize(rawToken, data.csrf);
+    ownerAuth.rotate(active);
+    if (action === 'logout') {
+      ownerAuth.logout();
+      return {};
+    }
+    require(['create', 'grant', 'revoke'].includes(action), 404, 'not_found');
+    const login = loginName(data.login);
+    require(login, 400, 'invalid_login');
+    const { plan } = data;
+    const days = /^[1-9][0-9]{0,2}$/.test(data.days ?? '') ? Number(data.days) : 0;
+    if (action !== 'revoke') {
+      require(plan === 'start' || plan === 'pro', 400, 'invalid_plan');
+      require(days >= 1 && days <= 365, 400, 'invalid_duration');
+    }
+    let issued;
+    let salt;
+    let computed;
+    if (action === 'create') {
+      require(!accountByLogin(login), 409, 'login_taken');
+      const password = data.password || token();
+      require(acceptablePassword(password, login), 400, 'weak_password');
+      salt = randomBytes(16);
+      computed = await hash(password, salt);
+      issued = { login, password, recoveryCode: token() };
+      require(ownerAuth.session(rawToken) === active, 403, 'owner_required');
+    }
+    return inTransaction(() => {
+      const time = now();
+      if (issued) insertAccount(login, salt, computed, issued.recoveryCode, time);
+      const account = accountByLogin(login);
+      require(account, 404, 'account_not_found');
+      let until = 0;
+      if (action === 'revoke') {
+        require(data.confirm === 'yes', 400, 'confirm_revoke');
+        const closedTrial = Math.min(account.trial_started_at ?? time, time - TRIAL_SECONDS);
+        db.prepare('UPDATE accounts SET trial_started_at=?, paid_until=0, manual_until=0 WHERE id=?')
+          .run(closedTrial, account.id);
+        db.prepare('DELETE FROM pro_access WHERE account_id=?').run(account.id);
+        db.prepare('DELETE FROM challenges WHERE account_id=?').run(account.id);
+      } else {
+        until = applyGrant(db, account, { days, plan }, time);
+      }
+      db.prepare(`
+        INSERT INTO store_owner_audit (account_id, action, plan, days, access_until, acted_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(account.id, action, action === 'revoke' ? null : plan, action === 'revoke' ? null : days, until, time);
+      return { issued, login, until };
     });
   }
 
@@ -631,5 +716,9 @@ export function createStore({
     sessionData,
     webAction,
     deviceAction,
+    ownerLogin: ownerAuth.login,
+    ownerSession: ownerAuth.session,
+    ownerAccounts,
+    ownerAction,
   };
 }

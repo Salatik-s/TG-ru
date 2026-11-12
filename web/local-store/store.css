@@ -216,7 +216,7 @@ main:has(.checkout-page) { flex: 0; }
 .form-card > a { align-content: center; min-block-size: 44px; width: fit-content; }
 .form-alt { text-align: center; font-size: .875rem; }
 .field { display: grid; gap: 8px; min-inline-size: 0; }
-.field input { inline-size: 100%; min-block-size: 52px; padding: 8px 16px; border: 1px solid var(--outline); border-radius: 12px; background: var(--bg); color: var(--text); }
+.field input, .field select { inline-size: 100%; min-block-size: 52px; padding: 8px 16px; border: 1px solid var(--outline); border-radius: 12px; background: var(--bg); color: var(--text); font: inherit; }
 .field input[aria-invalid="true"] { border-color: var(--danger); }
 .field > a, .generate { justify-self: start; min-block-size: 44px; align-content: center; }
 .password { display: flex; align-items: stretch; gap: 8px; }
@@ -288,6 +288,26 @@ main:has(.checkout-page) { flex: 0; }
 .footer-inner { display: grid; gap: 8px 24px; padding-block: 24px; }
 .footer-main { display: flex; align-items: start; flex-wrap: wrap; gap: 8px 16px; }
 .footer-main p { font-size: .875rem; align-self: center; }
+
+.trial-note { margin-block-start: 12px; font-size: .875rem; }
+.owner-grid, .owner-fields { display: grid; gap: 16px; }
+.owner-grid { align-items: start; margin-block-start: 20px; }
+.owner-fields { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: end; }
+.owner-list > form, .owner-account { inline-size: 100%; }
+.owner-list > form { grid-template-columns: minmax(0, 1fr) auto; }
+.owner-account { border-block-start: 1px solid var(--border); }
+.owner-account summary { padding-block: 12px; cursor: pointer; overflow-wrap: anywhere; }
+.owner-account summary span { display: block; padding-inline-start: 16px; color: var(--muted); font-size: .875rem; }
+.owner-account form { display: grid; gap: 12px; margin-block-start: 12px; }
+.owner-revoke { padding-block: 12px; }
+.owner-revoke label { font-size: .875rem; }
+.owner-issued { margin-block-start: 16px; overflow-wrap: anywhere; }
+.owner-issued dl, .owner-issued dd { margin: 0; }
+.owner-issued dt { color: var(--muted); margin-block-start: 8px; }
+
+@media (min-width: 800px) {
+  .owner-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); }
+}
 
 .route-figure, .steps li, .visibility-grid > div, .price-panel, .form-card, .dashboard-card {
   border: 1px solid var(--border);
