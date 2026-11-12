@@ -85,7 +85,7 @@ test('Billing migrates its private data and web serves a standalone Store previe
   assert.equal(page.status, 200);
   assert.match(page.headers.get('content-type'), /^text\/html/);
   assert.match(page.headers.get('content-security-policy'), /default-src 'none'/);
-  assert.match(await page.text(), /<html lang="ru">[\s\S]*<h1>Неофициальный клиент Telegram со своим шлюзом<\/h1>/);
+  assert.match(await page.text(), /<html lang="ru">[\s\S]*<h1>Telegram через VPN-шлюз TG-ru<\/h1>/);
   assert.match((await web.request('/preview.css')).headers.get('content-type'), /^text\/css/);
   assert.equal((await web.request('/health', { method: 'POST' })).status, 405);
   assert.equal((await web.request('/api/accounts')).status, 404);
