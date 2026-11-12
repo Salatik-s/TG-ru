@@ -5,7 +5,7 @@ umask 077
 base=/opt/tg-ru-store
 web=tg-ru-store-web-1
 staged=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)
-files=(web/local-store/pages.mjs web/local-store/store.css web/local-store/store.mjs i18n/ru.json)
+files=(web/local-store/pages.mjs web/local-store/store.css web/local-store/store.mjs i18n/ru.json local-store/store.mjs local-store/owner.mjs)
 die() { printf '%s\n' "$*" >&2; exit 1; }
 
 [[ $EUID == 0 && -f $base/.owned && $(cat "$base/.owned") == tg-ru-store-v1 ]] ||
@@ -20,6 +20,8 @@ grep -Fxq "$release/web/local-store /app/web/local-store" <<< "$mounts" ||
     die 'The Store web container does not use the active release.'
 grep -Fxq "$release/i18n /app/i18n" <<< "$mounts" ||
     die 'The Store web container does not use the active translations.'
+grep -Fxq "$release/local-store /app/local-store" <<< "$mounts" ||
+    die 'The Store web container does not use the active Store backend.'
 
 for file in "${files[@]}"; do
     [[ -s $staged/$file && ! -L $staged/$file && -f $release/$file && ! -L $release/$file ]] ||
@@ -32,10 +34,10 @@ restore() {
     status=$?
     trap - EXIT
     if (( status && changed )); then
-        for file in "${files[@]}"; do install -m 0644 "$backup/${file##*/}" "$release/$file"; done
+        for file in "${files[@]}"; do install -m 0644 "$backup/${file//\//_}" "$release/$file"; done
         docker restart "$web" >/dev/null || printf '%s\n' 'Store web restart needs review.' >&2
     fi
-    for file in "${files[@]}"; do rm -f -- "$backup/${file##*/}"; done
+    for file in "${files[@]}"; do rm -f -- "$backup/${file//\//_}"; done
     rm -f -- "$backup/legacy-before" "$backup/legacy-after"
     rmdir -- "$backup"
     exit "$status"
@@ -49,7 +51,7 @@ site() {
     curl --noproxy '*' --resolve 'tg.24projects.ru:443:127.0.0.1' -fsS --max-time 8 "https://tg.24projects.ru$1"
 }
 site /index.html > "$backup/legacy-before"
-for file in "${files[@]}"; do cp -p -- "$release/$file" "$backup/${file##*/}"; done
+for file in "${files[@]}"; do cp -p -- "$release/$file" "$backup/${file//\//_}"; done
 changed=1
 for file in "${files[@]}"; do
     temp=$(mktemp "$release/$file.home.XXXXXXXX")
@@ -61,6 +63,7 @@ ready=0
 for attempt in {1..20}; do
     if html=$(site / 2>/dev/null) && css=$(site /store.css 2>/dev/null) &&
        [[ $html == *'id="editor-plans"'* && $html == *'name="color-scheme" content="dark"'* &&
+          $html == *'rel="icon" type="image/png"'* && $html == *'/checkout?plan=pro'* &&
           $html != *'id="theme"'* && $css == *'.price-highlight-editor'* ]]; then
         ready=1
         break

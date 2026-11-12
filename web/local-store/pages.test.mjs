@@ -13,6 +13,7 @@ test('Store registration, trial and support use server-rendered forms', async (t
   const base = 'http://127.0.0.1:' + server.address().port;
   const home = await (await fetch(base)).text();
   assert.match(home, /name="color-scheme" content="dark"/);
+  assert.match(home, /rel="icon" type="image\/png" sizes="32x32" href="data:image\/png;base64,/);
   assert.doesNotMatch(home, /id="theme"|content="dark light"/);
   for (const [route, text] of [
     ['/terms', /Проба, цена и срок/],
@@ -27,7 +28,10 @@ test('Store registration, trial and support use server-rendered forms', async (t
   }
   assert.match(home, /id="gateway-plans"[\s\S]*<h4>DEMO<\/h4>[\s\S]*<h4>START<\/h4>[\s\S]*<h4>PRO<\/h4>/);
   assert.match(home, /id="editor-plans"[\s\S]*<h4>DEMO SECRET<\/h4>[\s\S]*<h4>SECRET<\/h4>[\s\S]*<h4>SECRET\+<\/h4>[\s\S]*CUSTOM/);
-  assert.match(home, /disabled>Выбрать PRO<\/button>/);
+  assert.match(home, /href="\/checkout\?plan=pro">Выбрать PRO<\/a>/);
+  assert.match(home, /На DEMO можно подключить два устройства, на START — три, на PRO — четыре/);
+  const proCheckout = await (await fetch(base + '/checkout?plan=pro')).text();
+  assert.match(proCheckout, /500 ₽ за 90 дней\. До 4 устройств/);
   const appAccountLink = await fetch(base + '/account', { redirect: 'manual' });
   assert.equal(appAccountLink.status, 303);
   assert.equal(appAccountLink.headers.get('location'), '/cabinet');
@@ -111,6 +115,10 @@ test('public Store downloads require a matching logged-in session and a fresh si
     req.end(fields ? new URLSearchParams(fields).toString() : undefined);
   });
   assert.equal((await request('/downloads')).headers.get('location'), '/login');
+  const landing = await (await request('/')).text();
+  const hero = landing.match(/<section class="wrap hero">[\s\S]*?<\/section>/)[0];
+  assert.match(hero, /href="\/register">Создать аккаунт<\/a>[\s\S]*href="\/login">Войти<\/a>/);
+  assert.doesNotMatch(hero, /Скачать APK/);
   assert.equal((await request('/downloads/TG-ru.apk')).status, 403);
   const register = await request('/register');
   const anon = register.headers.get('set-cookie').split(';', 1)[0];

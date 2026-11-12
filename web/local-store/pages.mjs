@@ -13,12 +13,13 @@ const clockTime = new Intl.DateTimeFormat('ru-RU', { timeStyle: 'short', timeZon
 const plural = new Intl.PluralRules('ru');
 const pages = new Set(['/', '/register', '/login', '/recover', '/cabinet', '/devices', '/downloads', '/help',
   '/checkout', '/visibility', '/terms', '/privacy', '/refunds', '/compatibility']);
-const protectedPages = new Set(['/cabinet', '/devices', '/checkout']);
+const protectedPages = new Set(['/cabinet', '/devices']);
 const forms = new Map([
   ['/form/register', 'register'], ['/form/login', 'login'], ['/form/recover', 'recover'], ['/form/logout', 'logout'],
   ['/form/trial', 'trial'], ['/form/devices/revoke', 'devices/revoke'],
 ]);
 const supportLink = 'https://t.me/prince_skazki';
+const favicon = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAACwElEQVR4nMRXX0hTYRT/3bvhdWJjYDUIJ9aMyDIKIeNaZGQwKJRYe4o99NBDKBX0UAwKepEIAutlDz4ESkEsiVbEoKKVNCoITXIQ+BCsJtKEmJBsbd6+8+1Oh3mvc3O7Pxjf7vfn/s4595xz78+MVXBpROlhg0cBOgUBDigwoxQIyCgKYgLwnl0F7nqF4P9bCnDxgdIuLuIOIz6KCoCRvV0UceXeWeFzwVwO3GsBoyV7W7wVGcbhzkeDG0CeCwo+VJy8wAhFwCGKhEjXFPaqkRMYF+ckW9SEewpj0Etee2AcPCKVGgwCcYu8zg0CcZurmnwrQckIg6HrfXY2gthMUmPVCttuGTZJ3ZuI4PuXMOIJwObsgqNtea1kA/58HcCr4JTG6h50XH/OSJKIP3HjRXh6eSkyhI9oQWv/KOSdVj0K3gcUzdVUEgvpFP8bf3wQbyaAZu8ndO6iGQk1dVZkJy5geDgEWFyQ+3zYbqtFKnoDwYchpOHCsdt+OHUioZ+AkhUW9XCNutNUuwWWTfkNMURfMnJWSAf6/GhV68nS4cfJv9cQ/QlkfrGJxlINWBPTSMzQKGPrimJuOHwLR4q4w8aUoL0R+aDMvz6FRwV5Y+t5hzPHtVtN2WXIPZidwlwuVVC314fuc37I7TlSk0n/fJkGyNi2j8YQxsdyVWCyy2jeL0NKxUClam/Sb7RlPgIJzl4fJicHMPfsBO6Pu9DSJGE+GkL8N1t29KNtByppAMPm8zh904Gxoav49iPEfjRpRYM8iG63ayk3tKDfB9aLbArpBVay9UW0QBUb+yIyseZUv64TLAnpI9EoMG6RvtthEIhbVEWDISBu6gMBGIcA1wWXR5RwpdSQFkglDXqFLt4JSS5VNRkZF+eE2oq5VmNyqSpGqNIsrw+X3gWk1UguUWhQIdC9iaNQJQurbaymPP8HAAD//56cWNAAAAAGSURBVAMAsRzb6b2KXo0AAAAASUVORK5CYII=';
 
 const paths = {
   phone: '<rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 17h2"/>',
@@ -82,6 +83,7 @@ function layout(title, content, { session, route, marketing = false } = {}) {
   <meta name="description" content="TG-ru — независимый Android-клиент Telegram с подпиской на доступ к шлюзу.">
   <meta name="color-scheme" content="dark">
   <title>${escapeHtml(title)} · TG-ru</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="${favicon}">
   <script src="/store.mjs"></script>
   <link rel="stylesheet" href="/store.css">
 </head>
@@ -113,14 +115,14 @@ function pricing(session, accountPath) {
   const gateway = 'Шлюз TG-ru';
   const editor = 'Онлайн-редактор TXT, Word, PDF, Excel';
   const plans = [
-    { name: 'DEMO', price: '0 ₽', term: 'на 5 часов', points: [gateway, 'Одна проба на аккаунт', 'Оплата не нужна'],
+    { name: 'DEMO', price: '0 ₽', term: 'на 5 часов', points: [gateway, 'До 2 устройств', 'Оплата не нужна'],
       button: action(accountPath, 'Попробовать DEMO') },
     { name: 'START', price: '199 ₽', term: 'в месяц', points: [gateway, 'До 3 устройств', 'Без автоматического списания'],
       button: session.account ? action('/checkout', 'Получить доступ', 'primary') : action('/register', 'Создать аккаунт', 'primary') },
     { name: 'PRO', price: '500 ₽', term: 'за 3 месяца', highlight: 'gateway', badge: 'Выгодно: −16%',
       previous: '597 ₽ при оплате START три раза', saving: '167 ₽ в месяц вместо 199 ₽ · экономия 97 ₽',
-      points: ['Всё из START', 'До 4 устройств', 'Платите раз в 3 месяца'],
-      button: '<button type="button" class="button primary" disabled>Выбрать PRO</button>' },
+      points: ['Всё из START', 'До 4 устройств', 'Оплата за 90 дней'],
+      button: action('/checkout?plan=pro', 'Выбрать PRO', 'primary') },
   ];
   const editorPlans = [
     { name: 'DEMO SECRET', price: '0 ₽', term: 'на 30 минут', points: [gateway, editor, 'Оплата не нужна'],
@@ -147,7 +149,7 @@ function pricing(session, accountPath) {
 <section id="price" class="wrap band">
   <h2>Подписка</h2>
   <section class="plan-group" aria-labelledby="gateway-plans">
-    <div class="plan-group-header"><h3 id="gateway-plans">Доступ к шлюзу</h3><p>PRO готовится к запуску</p></div>
+    <div class="plan-group-header"><h3 id="gateway-plans">Доступ к шлюзу</h3></div>
     <div class="price-grid">${plans.map(card).join('')}</div>
   </section>
   <section class="plan-group plan-group-editor" aria-labelledby="editor-plans">
@@ -162,10 +164,10 @@ function pricing(session, accountPath) {
 </section>`;
 }
 
-function home(session, release) {
+function home(session) {
   const accountPath = session.account ? '/cabinet' : '/register';
   const primary = action(accountPath, session.account ? 'Открыть кабинет' : 'Создать аккаунт', 'primary');
-  const secondary = release ? action('/downloads', 'Скачать APK') : action('/login', 'Войти');
+  const secondary = session.account ? '' : action('/login', 'Войти');
   return layout(strings.home.title, `
 <section class="wrap hero">
   <div class="hero-copy">
@@ -177,7 +179,7 @@ function home(session, release) {
     <figcaption>Маршрут подключения</figcaption>
     <ol class="route">
       <li><span class="route-icon">${icon('phone')}</span><span><strong>Ваш Android</strong><small>Приложение TG-ru</small></span></li>
-      <li class="route-current"><span class="route-icon">${icon('arrow')}</span><span><strong>VPN-шлюз TG-ru</strong><small>Маршрут зашифрованного трафика</small></span></li>
+      <li class="route-current"><span class="route-icon">${icon('arrow')}</span><span><strong>VPN-шлюз TG-ru</strong><small>Передаёт трафик в Telegram</small></span></li>
       <li><span class="route-icon">${icon('chat')}</span><span><strong>Telegram</strong><small>Чаты вашего аккаунта</small></span></li>
     </ol>
   </figure>
@@ -186,8 +188,8 @@ function home(session, release) {
   <h2>Как это работает</h2>
   <ol class="steps">
     <li><span>1</span><div><h3>Создайте аккаунт и запустите пробу</h3><p>Логин и пароль кабинета нужны для доступа к шлюзу TG-ru.</p></div></li>
-    <li><span>2</span><div><h3>Скачайте APK и привяжите телефон</h3><p>Введите логин и пароль кабинета один раз при активации приложения.</p></div></li>
-    <li><span>3</span><div><h3>Войдите в Telegram</h3><p>Вход по номеру телефона откроется после активации. Дальше приложение подтверждает устройство само.</p></div></li>
+    <li><span>2</span><div><h3>Установите TG-ru</h3><p>Скачайте APK в кабинете. При первом запуске введите логин и пароль TG-ru.</p></div></li>
+    <li><span>3</span><div><h3>Войдите в Telegram</h3><p>После подключения введите номер телефона, как при обычном входе в Telegram.</p></div></li>
   </ol>
 </section>
 <section class="wrap band">
@@ -201,8 +203,8 @@ ${pricing(session, accountPath)}
   <div class="faq">
     <details><summary>Как защищены сообщения?</summary><p>Приложение использует протокол MTProto для связи с Telegram. Наш VPN-шлюз пересылает зашифрованный трафик. <a href="/visibility">Подробнее о данных шлюза</a>.</p></details>
     <details><summary>Зачем два аккаунта?</summary><p>Кабинет TG-ru управляет доступом к VPN-шлюзу. В свой аккаунт Telegram вы входите отдельно, в приложении.</p></details>
-    <details><summary>Что будет, когда подписка закончится?</summary><p>Приложение покажет экран продления. Ваши данные Telegram на телефоне не удаляются.</p></details>
-    <details><summary>Сколько устройств можно подключить?</summary><p>До трёх.</p></details>
+    <details><summary>Что будет, когда подписка закончится?</summary><p>Приложение предложит продлить доступ. Данные Telegram на телефоне сохранятся.</p></details>
+    <details><summary>Сколько устройств можно подключить?</summary><p>На DEMO можно подключить два устройства, на START — три, на PRO — четыре.</p></details>
   </div>
 </section>`, { session, route: '/', marketing: true });
 }
@@ -222,7 +224,7 @@ function credentialsPage(route, session, { error, login = '' } = {}) {
 <section class="wrap form-page${registering ? ' register-page' : ''}">
   <form class="form-card" method="post" action="/form/${registering ? 'register' : 'login'}">
     <div class="form-intro"><h1>${title}</h1>
-    <p>${registering ? '199 ₽ в месяц, без автоматического списания.' : 'Войдите в кабинет TG-ru, чтобы посмотреть срок доступа и подключённые устройства.'}</p></div>
+    <p>${registering ? 'Проба на 5 часов бесплатна. START стоит 199 ₽ за 30 дней.' : 'Здесь можно посмотреть срок доступа и список устройств.'}</p></div>
     ${csrf(session)}${errorNotice(error)}
     <div class="field"><label for="login">Логин</label><input id="login" name="login" autocomplete="username" autocapitalize="none" spellcheck="false" required maxlength="24" value="${escapeHtml(login)}" ${registering ? 'minlength="3" pattern="[a-zA-Z0-9_]{3,24}" aria-describedby="login-hint"' : ''}>${fieldHint}</div>
     <div class="field"><label for="password">Пароль</label><div class="password"><input id="password" name="password" type="password" autocomplete="${registering ? 'new-password' : 'current-password'}" required maxlength="256" ${registering ? 'minlength="12" aria-describedby="password-hint"' : ''}><button type="button" class="button ghost" data-password="password" aria-pressed="false" hidden>Показать</button></div>${registering ? '<div class="password-hints"><small id="password-hint">Не короче 12 символов</small><button class="button ghost generate" type="button" data-generate="password" hidden>Сгенерировать пароль</button></div>' : '<a href="/recover">Забыли пароль?</a>'}</div>
@@ -268,8 +270,8 @@ function accessStatus(account, now) {
   const trialUntil = account.trial_until || 0;
   const until = Math.max(paidUntil, manualUntil, trialUntil);
   if (until <= now) return { until, active: false, trialAvailable: !account.trial_started_at && !until };
-  const label = until === paidUntil ? 'Подписка активна' : until === manualUntil ? 'Доступ выдан поддержкой' : 'Пробный период';
-  return { until, active: true, label, trial: until === trialUntil && until !== paidUntil && until !== manualUntil };
+  const label = account.plan === 'pro' ? 'PRO активен' : account.plan === 'start' ? 'START активен' : 'Пробный период';
+  return { until, active: true, label, trial: !account.plan };
 }
 
 function status(session, now, access) {
@@ -284,7 +286,7 @@ function status(session, now, access) {
     return `<p class="access-label">${access.label}</p><h2 class="access-title">Действует до ${calendarDate.format(deadline)}</h2>
       ${access.trial ? `<progress class="access-progress" value="${remaining}" max="${trialDuration}" aria-label="Осталось времени пробного доступа"></progress>` : ''}
       <p>${detail} Окончание в ${clockTime.format(deadline)} (МСК).</p>
-      <div class="actions">${action('/checkout', 'Продлить на 30 дней', 'primary')}${action('/#price', 'Сменить тариф')}</div>`;
+      <div class="actions">${session.account.plan === 'pro' ? action('/checkout?plan=pro', 'Продлить на 90 дней', 'primary') : action('/checkout', 'Продлить на 30 дней', 'primary')}${action('/#price', 'Сменить тариф')}</div>`;
   }
   if (access.trialAvailable) {
     return `<h2 class="access-title">Начните с 5 часов бесплатно</h2><p>Пробный период начнётся сразу после нажатия. Карта не нужна.</p>
@@ -305,7 +307,7 @@ function revokeDevice(device, session) {
 }
 
 function cabinet(session, error, now) {
-  const { devices, login } = session.account;
+  const { devices, login, device_limit } = session.account;
   const access = accessStatus(session.account, now);
   return layout('Кабинет', `
 <section class="wrap dashboard dashboard-overview">
@@ -318,14 +320,14 @@ function cabinet(session, error, now) {
         ${status(session, now, access)}
       </section>
       <section class="dashboard-card">
-        <div class="dashboard-card-heading"><h2>Устройства</h2><p>Подключено ${devices.length} из 3</p></div>
+        <div class="dashboard-card-heading"><h2>Устройства</h2><p>Подключено ${devices.length} из ${device_limit}</p></div>
         ${devices.length ? `<ul class="device-overview-list">${devices.map((device) => `<li>${deviceSummary(device)}${revokeDevice(device, session)}</li>`).join('')}</ul>` : '<p>Устройств пока нет. Войдите в TG-ru на Android, чтобы подключить первое.</p>'}
       </section>
     </div>
     <div class="dashboard-stack dashboard-aside">
       <section class="dashboard-card"><h2>Приложение</h2><p>TG-ru для Android. После установки введите логин и пароль на первом экране.</p>
         ${action('/downloads', 'Скачать APK', 'primary')}<a class="download-hash-link" href="/downloads#download-checksum">Как проверить хеш</a></section>
-      <section class="dashboard-card"><h2>Помощь</h2><p>Если доступ не появился или возникла проблема с подключением, напишите в поддержку.</p>
+      <section class="dashboard-card"><h2>Помощь</h2><p>Не получается подключиться или продлить доступ? Напишите в поддержку.</p>
         ${action('/help', 'Помощь с доступом')}</section>
     </div>
   </div>
@@ -334,32 +336,33 @@ function cabinet(session, error, now) {
 }
 
 function devices(session, error) {
-  const items = session.account.devices;
+  const { devices: items, device_limit } = session.account;
   return layout('Устройства', `
 <section class="wrap dashboard">
-  <div class="page-heading"><h1>Устройства</h1><p>Подключено ${items.length} из 3</p></div>
+  <div class="page-heading"><h1>Устройства</h1><p>Подключено ${items.length} из ${device_limit}</p></div>
   ${errorNotice(error)}
-  ${items.length === 3 ? `<p class="notice" role="status">${icon('info')}Достигнут лимит в 3 устройства. Отвяжите одно, чтобы подключить новое.</p>` : ''}
+  ${items.length >= device_limit ? `<p class="notice" role="status">${icon('info')}Все места заняты. Отвяжите устройство, чтобы подключить другое.</p>` : ''}
   ${items.length ? `<ul class="device-list">${items.map((device) => `<li>${deviceSummary(device)}${revokeDevice(device, session)}</li>`).join('')}</ul>` : `
   <div class="empty"><span class="route-icon">${icon('phone')}</span><h2>Устройств пока нет</h2><p>Скачайте приложение и введите логин и пароль TG-ru.</p>${action('/downloads', 'К загрузкам', 'primary')}</div>`}
   <p class="subtle"><a href="/cabinet">К обзору</a></p>
 </section>`, { session, route: '/devices' });
 }
 
-function checkout(session) {
+function checkout(session, pro) {
+  const contact = pro ? supportLink + '?text=' + encodeURIComponent('Здравствуйте! Хочу подключить PRO на 90 дней.') : supportLink;
   return layout('Оплата', `
 <section class="wrap form-page checkout-page">
   <div class="form-card">
-    <div class="form-intro"><h1>Оплата подписки</h1><p>199 ₽ за 30 дней. Автоматического списания нет.</p></div>
+    <div class="form-intro"><h1>Оплата подписки${pro ? ' PRO' : ''}</h1><p>${pro ? '500 ₽ за 90 дней. До 4 устройств.' : '199 ₽ за 30 дней. Автоматического списания нет.'}</p></div>
     <p class="notice" role="status">Оплата временно недоступна. Для получения доступа обратитесь в поддержку.</p>
-    <div class="actions">${action(supportLink, 'Написать в поддержку', 'primary')}${action('/cabinet', 'Отмена')}</div>
+    <div class="actions">${action(contact, 'Написать в поддержку', 'primary')}${action(session.account ? '/cabinet' : '/#price', 'Отмена')}</div>
   </div>
 </section>`, { session, route: '/checkout' });
 }
 
 const documents = {
   '/downloads': ['Загрузки', '<h2>Подключение устройства</h2><ol><li>Создайте аккаунт TG-ru и запустите пятичасовую пробу или получите доступ через поддержку.</li><li>Откройте приложение и введите логин и пароль TG-ru.</li><li>Войдите в свой аккаунт Telegram на следующем экране.</li></ol><p>При установке Android может попросить разрешить установку приложений из браузера.</p>'],
-  '/help': ['Помощь', `<h2>Доступ к шлюзу</h2><p>Оплата временно недоступна. Для получения доступа обратитесь в поддержку.</p><p><a href="${supportLink}">Написать в поддержку</a></p><h2>Не получается подключить телефон</h2><p>Проверьте, что пробный период или подписка действуют. При лимите в три телефона сначала отвяжите одно из устройств в кабинете.</p><p><a href="/cabinet">Открыть кабинет</a></p>`],
+  '/help': ['Помощь', `<h2>Как получить доступ</h2><p>Онлайн-оплата пока недоступна. Напишите в поддержку, чтобы подключить START или PRO.</p><p><a href="${supportLink}">Написать в поддержку</a></p><h2>Телефон не подключается</h2><p>Откройте кабинет и проверьте срок доступа. Если все места заняты, отвяжите телефон, которым больше не пользуетесь.</p><p><a href="/cabinet">Открыть кабинет</a></p>`],
   '/visibility': ['Что мы видим, а чего нет', `
 <p>Кабинет управляет доступом, шлюз пересылает трафик, а Telegram обслуживает аккаунт и чаты.</p>
 ${visibilitySummary()}
@@ -375,8 +378,8 @@ ${visibilitySummary()}
 <h2>Что предоставляет TG-ru</h2>
 <p>TG-ru — независимый клиент, использующий Telegram API. Сервис даёт доступ к собственному шлюзу для соединения с Telegram. Для переписки нужен отдельный аккаунт Telegram. <a href="https://telegram.org/tos">Условия Telegram</a> действуют при использовании мессенджера.</p>
 <h2>Проба, цена и срок</h2>
-<ul><li>Пробный доступ действует 5 часов с момента запуска. Он доступен один раз на аккаунт и не требует банковской карты.</li>
-<li>Для START указана цена 199 ₽ за 30 дней. Автоматических списаний нет. PRO и тарифы редактора находятся в разработке.</li>
+<ul><li>Пробный доступ действует 5 часов с момента запуска. Он доступен один раз на аккаунт, рассчитан на два устройства и не требует банковской карты.</li>
+<li>START стоит 199 ₽ за 30 дней и даёт доступ на трёх устройствах. PRO стоит 500 ₽ за 90 дней и поддерживает четыре устройства. Чтобы подключить тариф, напишите в поддержку. Автоматических списаний нет. Редактор файлов в разработке.</li>
 <li>После окончания срока шлюз перестаёт принимать подключения этого аккаунта. Оставшееся время и привязанные устройства отображаются в кабинете.</li></ul>
 <h2>Подключение и правила пользования</h2>
 <p>Создайте аккаунт, сохраните код восстановления, запустите пробу или получите доступ через поддержку и активируйте устройство. В кабинете можно отвязать телефон. Запрещено использовать шлюз для спама, атак, неправомерного доступа и других действий, нарушающих применимые правила.</p>
@@ -436,7 +439,7 @@ function redirect(response, location) {
 function respond(response, status, type, body, head = false) {
   response.writeHead(status, {
     'Content-Type': type,
-    'Content-Security-Policy': "default-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'",
+    'Content-Security-Policy': "default-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'",
     'Referrer-Policy': 'no-referrer',
     'X-Content-Type-Options': 'nosniff',
     'Cache-Control': 'no-store',
@@ -511,14 +514,14 @@ export async function handleStorePages(request, response, { getSession, submit, 
   }
 
   if ((protectedPages.has(route) || release && route === '/downloads') && !session.account) redirect(response, '/login');
-  else if (route === '/') html(home(session, release));
+  else if (route === '/') html(home(session));
   else if (route === '/register' || route === '/login') {
     if (session.account) redirect(response, '/cabinet');
     else html(credentialsPage(route, session));
   } else if (route === '/recover') html(recover(session));
   else if (route === '/cabinet') html(cabinet(session, '', now));
   else if (route === '/devices') html(devices(session));
-  else if (route === '/checkout') html(checkout(session));
+  else if (route === '/checkout') html(checkout(session, url.searchParams.get('plan') === 'pro'));
   else html(documentPage(route, session, release));
   return true;
 }

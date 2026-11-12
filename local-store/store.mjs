@@ -60,6 +60,11 @@ function localDatabase(path) {
       db.exec(readFileSync(new URL('./manual-grants.sql', import.meta.url), 'utf8'));
       db.exec('PRAGMA user_version=2');
     }
+    // An additive table lets the prior runtime continue reading the database during a deployment rollback.
+    db.exec(`CREATE TABLE IF NOT EXISTS pro_access (
+      account_id TEXT PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
+      expires_at INTEGER NOT NULL CHECK(expires_at > 0)
+    ) STRICT`);
     db.exec('COMMIT');
     return db;
   } catch (error) {
@@ -122,6 +127,18 @@ function expiry(account) {
   return { trialUntil, accessUntil: Math.max(trialUntil ?? 0, account.paid_until, account.manual_until) };
 }
 
+function proExpiresAt(db, accountId) {
+  return db.prepare('SELECT expires_at FROM pro_access WHERE account_id=?').get(accountId)?.expires_at ?? 0;
+}
+
+function startExpiresAt(account) {
+  return Math.max(account.paid_until, account.manual_until);
+}
+
+function deviceLimit(account, proUntil, time) {
+  return proUntil > time ? 4 : startExpiresAt(account) > time ? 3 : 2;
+}
+
 function transaction(db, callback) {
   db.exec('BEGIN IMMEDIATE');
   try {
@@ -140,29 +157,38 @@ export function grantStoreAccess({
   login: input,
   days,
   reason,
+  plan = 'start',
+  onlyIfInactive = false,
   now = () => Math.floor(Date.now() / 1000),
 }) {
   const login = loginName(input);
   require(login, 400, 'invalid_login');
   require(Number.isInteger(days) && days >= 1 && days <= 365, 400, 'invalid_duration');
   require(MANUAL_GRANT_REASONS.includes(reason), 400, 'invalid_reason');
+  require(plan === 'start' || plan === 'pro' && days === 90, 400, 'invalid_plan');
   const db = localDatabase(database);
   try {
     return transaction(db, () => {
       const account = db.prepare('SELECT * FROM accounts WHERE login=?').get(login);
       require(account, 404, 'account_not_found');
       const time = now();
+      const accessUntil = expiry(account).accessUntil;
+      if (onlyIfInactive && accessUntil > time) return { skipped: true, access_until: accessUntil };
       const { total } = db.prepare('SELECT count(*) AS total FROM manual_grant_audit WHERE granted_at>?')
         .get(time - DAY);
       require(total < 3, 429, 'manual_grant_limit');
-      const until = Math.max(time, expiry(account).accessUntil) + days * DAY;
+      const until = Math.max(time, accessUntil) + days * DAY;
       const id = randomUUID();
       db.prepare('UPDATE accounts SET manual_until=? WHERE id=?').run(until, account.id);
+      if (plan === 'pro') {
+        db.prepare('INSERT INTO pro_access VALUES (?,?) ON CONFLICT(account_id) DO UPDATE SET expires_at=excluded.expires_at')
+          .run(account.id, until);
+      }
       db.prepare(`
         INSERT INTO manual_grant_audit (id, account_id, reason, days, granted_at, expires_at)
         VALUES (?, ?, ?, ?, ?, ?)
       `).run(id, account.id, reason, days, time, until);
-      return { grant_id: id, reason, days, granted_at: time, manual_until: until };
+      return { grant_id: id, reason, days, plan, granted_at: time, manual_until: until };
     });
   } finally {
     db.close();
@@ -202,15 +228,22 @@ export function createStore({
     return db.prepare('SELECT * FROM accounts WHERE login = ?').get(login);
   }
 
+  function activeDevices(accountId) {
+    return db.prepare(`
+      SELECT id, name, activated_at FROM devices WHERE account_id=? AND revoked_at IS NULL
+      ORDER BY activated_at, id
+    `).all(accountId);
+  }
+
   function publicAccount(id) {
     if (!id) return null;
     const account = accountById(id);
     if (!account) return null;
     const { trialUntil, accessUntil } = expiry(account);
-    const devices = db.prepare(`
-      SELECT id, name, activated_at FROM devices WHERE account_id = ? AND revoked_at IS NULL
-      ORDER BY activated_at, id
-    `).all(id);
+    const time = now();
+    const proUntil = proExpiresAt(db, id);
+    const pro = proUntil > time;
+    const start = startExpiresAt(account) > time;
     return {
       login: account.login,
       trial_started_at: account.trial_started_at,
@@ -218,8 +251,11 @@ export function createStore({
       paid_until: account.paid_until,
       manual_until: account.manual_until,
       access_until: accessUntil,
-      active: accessUntil > now(),
-      devices,
+      active: accessUntil > time,
+      plan: pro ? 'pro' : start ? 'start' : null,
+      pro_until: proUntil,
+      device_limit: deviceLimit(account, proUntil, time),
+      devices: activeDevices(id),
     };
   }
 
@@ -266,9 +302,9 @@ export function createStore({
     return account;
   }
 
-  function checkAccess(account, code) {
+  function checkAccess(account, code, time = now()) {
     const { accessUntil } = expiry(account);
-    require(accessUntil > now(), 403, code);
+    require(accessUntil > time, 403, code);
     return accessUntil;
   }
 
@@ -510,20 +546,25 @@ export function createStore({
     const name = typeof data.name === 'string' ? data.name.trim() : 'Android';
     require(name.length > 0 && [...name].length <= 64 && !/[\p{C}]/u.test(name), 400, 'bad_request');
     return consumeProof(data.token, 'activate', () => key, signature, (challenge) => {
-      const accessUntil = checkAccess(accountById(challenge.account_id), 'subscription_required');
+      const account = accountById(challenge.account_id);
+      const time = now();
+      const accessUntil = checkAccess(account, 'subscription_required', time);
       const existing = db.prepare('SELECT account_id, revoked_at FROM devices WHERE id=?').get(id);
       require(!existing || existing.account_id === challenge.account_id, 409, 'device_linked_elsewhere');
+      const devices = activeDevices(challenge.account_id);
+      const proUntil = proExpiresAt(db, challenge.account_id);
+      const limit = deviceLimit(account, proUntil, time);
       if (!existing || existing.revoked_at !== null) {
-        const { total } = db.prepare('SELECT count(*) AS total FROM devices WHERE account_id=? AND revoked_at IS NULL')
-          .get(challenge.account_id);
-        require(total < 3, 409, 'device_limit');
+        require(devices.length < limit, 409, 'device_limit');
+      } else {
+        require(devices.findIndex(device => device.id === id) < limit, 409, 'device_limit');
       }
       db.prepare(`
         INSERT INTO devices (id, account_id, public_key, name, activated_at) VALUES (?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET name=excluded.name, revoked_at=NULL,
           activated_at=CASE WHEN devices.revoked_at IS NULL THEN devices.activated_at ELSE excluded.activated_at END
-      `).run(id, challenge.account_id, der, name, now());
-      return lease(id, accessUntil);
+      `).run(id, challenge.account_id, der, name, time);
+      return deviceLease(account, id, accessUntil, proUntil, time);
     });
   }
 
@@ -536,9 +577,18 @@ export function createStore({
       return keyFromDer(Buffer.from(device.public_key));
     }, signature, () => {
       require(device.revoked_at === null, 403, 'device_revoked');
-      const accessUntil = checkAccess(accountById(device.account_id), 'subscription_expired');
-      return lease(device.id, accessUntil);
+      const account = accountById(device.account_id);
+      const time = now();
+      const accessUntil = checkAccess(account, 'subscription_expired', time);
+      return deviceLease(account, device.id, accessUntil, proExpiresAt(db, device.account_id), time);
     });
+  }
+
+  function deviceLease(account, id, accessUntil, proUntil, time) {
+    const index = activeDevices(account.id).findIndex(device => device.id === id);
+    require(index >= 0 && index < deviceLimit(account, proUntil, time), 409, 'device_limit');
+    const tierUntil = index === 3 ? proUntil : index === 2 ? startExpiresAt(account) : accessUntil;
+    return lease(id, Math.min(accessUntil, tierUntil));
   }
 
   async function deviceAction(action, data) {

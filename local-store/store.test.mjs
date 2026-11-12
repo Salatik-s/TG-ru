@@ -205,7 +205,7 @@ test('mock payments require explicit mode and paid, canceled and replayed orders
   assert.equal(renewal.body.account.paid_until, paid.account.paid_until + 30 * DAY);
 });
 
-test('activation proves key possession, expires after ten minutes, is single-use and limits three devices', async (t) => {
+test('trial activation proves key possession, expires after ten minutes, is single-use and limits two devices', async (t) => {
   const { browser, signup, advance } = await fixture(t);
   const client = browser();
   const { login } = await signup(client);
@@ -219,7 +219,6 @@ test('activation proves key possession, expires after ten minutes, is single-use
   const first = installation();
   const second = installation();
   const third = installation();
-  const fourth = installation();
   const stale = await issue();
   advance(600);
   assert.equal((await native.request('activate', first.activation(stale))).body.code, 'invalid_token');
@@ -231,17 +230,62 @@ test('activation proves key possession, expires after ten minutes, is single-use
   assert.match(activated.device_id, /^[a-f0-9]{64}$/);
   assert.equal((await native.request('activate', valid)).body.code, 'invalid_token');
   assert.equal((await native.request('activate', second.activation(await issue()))).status, 200);
-  assert.equal((await native.request('activate', third.activation(await issue()))).status, 200);
-  const fourthAttempt = fourth.activation(await issue());
-  assert.equal((await native.request('activate', fourthAttempt)).body.code, 'device_limit');
-  assert.equal((await native.request('activate', fourthAttempt)).body.code, 'invalid_token');
+  const thirdAttempt = third.activation(await issue());
+  assert.equal((await native.request('activate', thirdAttempt)).body.code, 'device_limit');
+  assert.equal((await native.request('activate', thirdAttempt)).body.code, 'invalid_token');
   const renew = (await native.request('device/challenge', { device_id: activated.device_id })).body;
   assert.equal((await native.request('device/renew', first.renewal(renew))).status, 200);
   assert.equal((await native.request('device/renew', first.renewal(renew))).body.code, 'invalid_token');
-  assert.equal((await client.request('devices/revoke', { device_id: activated.device_id })).body.account.devices.length, 2);
+  assert.equal((await client.request('devices/revoke', { device_id: activated.device_id })).body.account.devices.length, 1);
   const revoked = (await native.request('device/challenge', { device_id: activated.device_id })).body;
   assert.equal((await native.request('device/renew', first.renewal(revoked))).body.code, 'device_revoked');
-  assert.equal((await native.request('activate', fourth.activation(await issue()))).status, 200);
+  assert.equal((await native.request('activate', third.activation(await issue()))).status, 200);
+});
+
+test('owner grants START with three devices and PRO with four, then expires the extra PRO lease', async (t) => {
+  const directory = mkdtempSync(join(tmpdir(), 'tgru-plan-grant-'));
+  const database = join(directory, 'store.sqlite');
+  const { browser, signup, now, advance } = await fixture(t, { database });
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const web = browser();
+  const { login } = await signup(web);
+  const native = browser();
+  const grant = (days, plan, onlyIfInactive = false) =>
+    grantStoreAccess({ database, login: login.login, days, plan, onlyIfInactive, reason: 'test', now });
+  const enroll = async (device) => {
+    const issued = (await native.request('activation-token', login)).body;
+    return native.request('activate', device.activation(issued));
+  };
+
+  const start = grant(30, 'start', true);
+  assert.equal(grant(30, 'start', true).access_until, start.manual_until);
+  assert.equal((await web.request('session')).body.account.device_limit, 3);
+  const devices = Array.from({ length: 4 }, () => installation());
+  for (const device of devices.slice(0, 3)) {
+    assert.equal((await enroll(device)).status, 200);
+    advance(1);
+  }
+  assert.equal((await enroll(devices[3])).body.code, 'device_limit');
+  const pro = grant(90, 'pro');
+  const fourth = (await enroll(devices[3])).body;
+  assert.ok(fourth.device_id);
+  assert.equal((await enroll(installation())).body.code, 'device_limit');
+  const current = (await web.request('session')).body.account;
+  assert.equal(current.plan, 'pro');
+  assert.equal(current.device_limit, 4);
+  assert.equal(current.pro_until, start.manual_until + 90 * DAY);
+  grant(30, 'start');
+  advance(pro.manual_until - now() - 5);
+  const challenge = () => native.request('device/challenge', { device_id: fourth.device_id });
+  const renew = async () => native.request('device/renew', devices[3].renewal((await challenge()).body));
+  assert.equal((await renew()).body.lease_until, pro.manual_until);
+  advance(5);
+  assert.equal((await renew()).body.code, 'device_limit');
+  await web.request('session');
+  const renewed = (await web.request('login', login)).body.account;
+  assert.equal(renewed.plan, 'start');
+  assert.equal(renewed.device_limit, 3);
+  assert.equal(renewed.active, true);
 });
 
 test('manual grants preserve the trial, are console-only and expire with the signed device lease', async (t) => {
