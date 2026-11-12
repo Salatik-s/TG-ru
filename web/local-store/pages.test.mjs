@@ -11,6 +11,10 @@ test('Store registration, trial and support use server-rendered forms', async (t
   t.after(() => new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve())));
 
   const base = 'http://127.0.0.1:' + server.address().port;
+  const home = await (await fetch(base)).text();
+  assert.match(home, /id="gateway-plans"[\s\S]*<h4>DEMO<\/h4>[\s\S]*<h4>START<\/h4>[\s\S]*<h4>PRO<\/h4>/);
+  assert.match(home, /id="editor-plans"[\s\S]*<h4>DEMO SECRET<\/h4>[\s\S]*<h4>SECRET<\/h4>[\s\S]*<h4>SECRET\+<\/h4>[\s\S]*CUSTOM/);
+  assert.match(home, /disabled>Выбрать PRO<\/button>/);
   const appAccountLink = await fetch(base + '/account', { redirect: 'manual' });
   assert.equal(appAccountLink.status, 303);
   assert.equal(appAccountLink.headers.get('location'), '/cabinet');
@@ -48,6 +52,7 @@ test('Store registration, trial and support use server-rendered forms', async (t
   const overview = await fetch(base + '/cabinet', { headers: { cookie } });
   const overviewBody = await overview.text();
   assert.match(overviewBody, /Попробовать 5 часов бесплатно/);
+  assert.match(overviewBody, /<h2>Платежи<\/h2>/);
   const trialToken = overviewBody.match(/name="csrf" value="([^"]+)"/)?.[1];
   const trial = await post('/form/trial', { csrf: trialToken }, cookie);
   assert.equal(trial.status, 303);

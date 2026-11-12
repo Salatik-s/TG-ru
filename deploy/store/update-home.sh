@@ -60,7 +60,7 @@ docker restart "$web" >/dev/null
 ready=0
 for attempt in {1..20}; do
     if html=$(site / 2>/dev/null) && css=$(site /store.css 2>/dev/null) &&
-       [[ $html == *'VPN-шлюз TG-ru'* && $css == *'.plan-points'* ]]; then
+       [[ $html == *'id="editor-plans"'* && $css == *'.price-highlight-editor'* ]]; then
         ready=1
         break
     fi

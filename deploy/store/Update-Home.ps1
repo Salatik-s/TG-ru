@@ -25,7 +25,7 @@ try {
     & ssh.exe -t -- $SshTarget $command
     if ($LASTEXITCODE -ne 0) { throw 'Store homepage update failed. See the rollback diagnostics above.' }
     $page = & curl.exe -fsS --max-time 12 'https://tg.24projects.ru/'
-    if ($LASTEXITCODE -ne 0 -or ($page -join "`n") -notmatch 'class="plan-points"') {
+    if ($LASTEXITCODE -ne 0 -or ($page -join "`n") -notmatch 'id="editor-plans"') {
         throw 'The new Store homepage could not be verified from this PC.'
     }
     Write-Host 'The updated homepage is reachable publicly. Only the Store web container was restarted.'
