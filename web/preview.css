@@ -1,0 +1,39 @@
+:root {
+  color-scheme: light dark;
+  font: 100%/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: Canvas;
+  color: CanvasText;
+}
+
+body {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  min-block-size: 100vh;
+  max-inline-size: 70ch;
+  margin: 0 auto;
+  padding-inline: 24px;
+}
+
+header,
+footer {
+  padding-block: 24px;
+}
+
+header {
+  font-weight: 700;
+}
+
+main {
+  align-self: center;
+  padding-block: 48px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 2rem;
+  line-height: 1.25;
+}
+
+p {
+  margin: 16px 0 0;
+}
