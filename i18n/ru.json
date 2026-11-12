@@ -1,0 +1,18 @@
+{
+  "site": {
+    "title": "TG-ru",
+    "disclaimer": "TG-ru — неофициальный клиент Telegram. Не связан с Telegram FZ-LLC."
+  },
+  "home": {
+    "title": "Неофициальный клиент Telegram со своим шлюзом",
+    "subtitle": "Работает через сервер TG-ru. Подписка 199 ₽ в месяц. Отмена в любой момент"
+  },
+  "cabinet": {
+    "status": {
+      "active": "Активна",
+      "expired": "Закончилась",
+      "pending": "Ожидает оплаты",
+      "revoked": "Отозвано"
+    }
+  }
+}
