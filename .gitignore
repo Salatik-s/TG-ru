@@ -33,6 +33,9 @@ release/
 *.dex
 
 # Local QA outputs and credentials are never published.
+.env
+.env.*
+!.env.example
 **/build/
 /qa/**/build-*/
 /native/build-*/

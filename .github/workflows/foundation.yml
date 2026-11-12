@@ -1,0 +1,32 @@
+name: Foundation services
+
+on:
+  pull_request:
+    paths:
+      - 'billing/**'
+      - 'deploy/foundation/**'
+      - 'foundation/**'
+      - 'i18n/**'
+      - 'web/**'
+      - '.github/workflows/foundation.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  foundation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Test Billing and web processes
+        run: |
+          docker run --rm --read-only --network none --tmpfs /tmp:size=64m \
+            --user 1000:1000 --cap-drop ALL --security-opt no-new-privileges \
+            --volume "$PWD:/app:ro" --workdir /app \
+            node:24-bookworm-slim@sha256:c0a93797ee78814ae6d32fcca2561fdbbe423149c3f5389aad32d86e9fd85bd4 \
+            node --test billing/test/database.test.mjs foundation/test/services.test.mjs
+      - name: Verify container isolation
+        run: node deploy/foundation/verify-isolation.mjs

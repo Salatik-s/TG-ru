@@ -1,0 +1,27 @@
+# Test fixture only. It represents Gateway's UID and independent network/data directory.
+services:
+  gateway-probe:
+    image: node:24-bookworm-slim@sha256:c0a93797ee78814ae6d32fcca2561fdbbe423149c3f5389aad32d86e9fd85bd4
+    user: "10001:10001"
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    tmpfs:
+      - /data:mode=0700,uid=10001,gid=10001
+    networks: [gateway-probe]
+    command:
+      - node
+      - -e
+      - |
+        const db = new (require('node:sqlite').DatabaseSync)('/data/access.sqlite');
+        db.exec('CREATE TABLE gateway_probe (id INTEGER PRIMARY KEY)');
+        require('node:http').createServer((_, res) => res.end('probe')).listen(8080, '0.0.0.0');
+    healthcheck:
+      interval: 2s
+      timeout: 3s
+      retries: 10
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:8080/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+
+networks:
+  gateway-probe:
+    internal: true

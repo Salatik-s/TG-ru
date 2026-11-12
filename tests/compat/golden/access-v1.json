@@ -1,0 +1,16 @@
+{
+  "new": {"status": 200, "body": {"device_id": "<device>", "status": "new", "failures": 0, "cooldown_until": 0, "server_time": 0, "phone_owner": false}},
+  "pending": {"status": 200, "body": {"device_id": "<device>", "status": "pending", "failures": 0, "cooldown_until": 0, "server_time": 0, "phone_owner": false}},
+  "pending_config": {"status": 403, "body": {"error": "not_approved"}},
+  "replay": {"status": 410, "body": {"error": "expired_or_replayed"}},
+  "config": {
+    "status": 200,
+    "body": {
+      "device_id": "<device>", "status": "approved", "failures": 0, "cooldown_until": 0,
+      "server_time": 0, "phone_owner": false,
+      "gateway": {"protocol": "vless", "host": "gateway.invalid", "port": 18443, "uuid": "<uuid>", "security": "reality", "public_key": "fixture-public-key", "short_id": "aabb", "server_name": "cover.invalid", "flow": "xtls-rprx-vision", "fingerprint": "chrome"},
+      "gateway_fallbacks": [{"protocol": "vless", "host": "gateway.invalid", "port": 8443, "uuid": "<uuid>", "security": "tls", "transport": "ws", "path": "/v1/transport", "server_name": "gateway.invalid", "flow": "", "fingerprint": ""}],
+      "notifications": {"endpoint": "https://gateway.invalid:8443/v1/push/<device>/<secret>", "stream_url": "https://gateway.invalid:8443/v1/events", "token": "<token>", "expires_at": 75}
+    }
+  }
+}

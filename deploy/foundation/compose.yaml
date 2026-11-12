@@ -1,0 +1,67 @@
+name: tg-ru-foundation
+
+x-service: &service
+  working_dir: /app
+  init: true
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  pids_limit: 64
+  logging:
+    driver: json-file
+    options: {max-size: "5m", max-file: "2"}
+
+x-healthcheck: &healthcheck
+  interval: 5s
+  timeout: 3s
+  retries: 5
+
+services:
+  billing:
+    <<: *service
+    build:
+      context: .
+      dockerfile: billing.Dockerfile
+    user: "10002:10002"
+    command: [node, billing/main.mjs]
+    environment:
+      TG_RU_BILLING_HOST: 0.0.0.0
+      TG_RU_BILLING_PORT: "8081"
+      TG_RU_BILLING_DATA_DIR: /data
+    volumes:
+      - ../../foundation:/app/foundation:ro
+      - ../../billing:/app/billing:ro
+      - billing-data:/data
+    networks: [billing]
+    healthcheck:
+      <<: *healthcheck
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:8081/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+
+  web:
+    <<: *service
+    image: node:24-bookworm-slim@sha256:c0a93797ee78814ae6d32fcca2561fdbbe423149c3f5389aad32d86e9fd85bd4
+    user: "10003:10003"
+    command: [node, web/main.mjs]
+    environment:
+      TG_RU_WEB_HOST: 0.0.0.0
+      TG_RU_WEB_PORT: "8082"
+    volumes:
+      - ../../foundation:/app/foundation:ro
+      - ../../web:/app/web:ro
+      - ../../i18n:/app/i18n:ro
+    ports:
+      - target: 8082
+        published: "${TG_RU_WEB_PORT:-8082}"
+        host_ip: 127.0.0.1
+    networks: [web]
+    healthcheck:
+      <<: *healthcheck
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:8082/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+
+networks:
+  billing:
+    internal: true
+  web: {}
+
+volumes:
+  billing-data: {}
