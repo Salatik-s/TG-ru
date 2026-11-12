@@ -7,7 +7,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
-$files = @('deploy/store/update-home.sh','web/local-store/pages.mjs','web/local-store/store.css','i18n/ru.json')
+$files = @('deploy/store/update-home.sh','web/local-store/pages.mjs','web/local-store/store.css','web/local-store/store.mjs','i18n/ru.json')
 & node --test (Join-Path $repo 'web/local-store/pages.test.mjs')
 if ($LASTEXITCODE -ne 0) { throw 'Store page tests failed.' }
 if ($PlanOnly) { return }
@@ -25,7 +25,7 @@ try {
     & ssh.exe -t -- $SshTarget $command
     if ($LASTEXITCODE -ne 0) { throw 'Store homepage update failed. See the rollback diagnostics above.' }
     $page = & curl.exe -fsS --max-time 12 'https://tg.24projects.ru/'
-    if ($LASTEXITCODE -ne 0 -or ($page -join "`n") -notmatch 'id="editor-plans"') {
+    if ($LASTEXITCODE -ne 0 -or ($page -join "`n") -notmatch 'name="color-scheme" content="dark"') {
         throw 'The new Store homepage could not be verified from this PC.'
     }
     Write-Host 'The updated homepage is reachable publicly. Only the Store web container was restarted.'

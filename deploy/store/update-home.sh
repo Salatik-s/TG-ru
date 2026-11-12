@@ -5,7 +5,7 @@ umask 077
 base=/opt/tg-ru-store
 web=tg-ru-store-web-1
 staged=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)
-files=(web/local-store/pages.mjs web/local-store/store.css i18n/ru.json)
+files=(web/local-store/pages.mjs web/local-store/store.css web/local-store/store.mjs i18n/ru.json)
 die() { printf '%s\n' "$*" >&2; exit 1; }
 
 [[ $EUID == 0 && -f $base/.owned && $(cat "$base/.owned") == tg-ru-store-v1 ]] ||
@@ -60,13 +60,16 @@ docker restart "$web" >/dev/null
 ready=0
 for attempt in {1..20}; do
     if html=$(site / 2>/dev/null) && css=$(site /store.css 2>/dev/null) &&
-       [[ $html == *'id="editor-plans"'* && $css == *'.price-highlight-editor'* ]]; then
+       [[ $html == *'id="editor-plans"'* && $html == *'name="color-scheme" content="dark"'* &&
+          $html != *'id="theme"'* && $css == *'.price-highlight-editor'* ]]; then
         ready=1
         break
     fi
     sleep 1
 done
 (( ready )) || die 'Store homepage did not pass the post-update check.'
+terms=$(site /terms)
+[[ $terms == *'https://telegram.org/tos'* ]] || die 'Store terms page did not pass the post-update check.'
 session=$(site /api/store/session)
 [[ $session == *'"ok":true'* ]] || die 'The Store session API did not respond.'
 site /index.html > "$backup/legacy-after"

@@ -1,32 +1,7 @@
 (() => {
   'use strict';
 
-  const allowedThemes = new Set(['light', 'dark', 'system']);
-  let theme = 'dark';
-  try {
-    const saved = localStorage.getItem('tg-ru-theme');
-    if (allowedThemes.has(saved)) theme = saved;
-  } catch {}
-  const systemLight = window.matchMedia('(prefers-color-scheme: light)');
-  const setTheme = (value) => {
-    document.documentElement.dataset.theme = value === 'system' && systemLight.matches ? 'system-light' : value;
-  };
-  setTheme(theme);
-  systemLight.addEventListener('change', () => setTheme(theme));
-
   document.addEventListener('DOMContentLoaded', () => {
-    const picker = document.querySelector('#theme');
-    if (picker) {
-      picker.value = theme;
-      picker.parentElement.hidden = false;
-      picker.addEventListener('change', () => {
-        if (!allowedThemes.has(picker.value)) return;
-        theme = picker.value;
-        setTheme(theme);
-        try { localStorage.setItem('tg-ru-theme', theme); } catch {}
-      });
-    }
-
     for (const button of document.querySelectorAll('[data-password]')) {
       const field = document.getElementById(button.dataset.password);
       if (!field) continue;

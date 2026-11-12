@@ -12,6 +12,19 @@ test('Store registration, trial and support use server-rendered forms', async (t
 
   const base = 'http://127.0.0.1:' + server.address().port;
   const home = await (await fetch(base)).text();
+  assert.match(home, /name="color-scheme" content="dark"/);
+  assert.doesNotMatch(home, /id="theme"|content="dark light"/);
+  for (const [route, text] of [
+    ['/terms', /Проба, цена и срок/],
+    ['/privacy', /Какие данные обрабатываем и зачем/],
+    ['/visibility', /Как проходит соединение/],
+    ['/refunds', /Как рассматривается обращение/],
+    ['/compatibility', /Редакции и доступ/],
+  ]) {
+    const document = await fetch(base + route);
+    assert.equal(document.status, 200);
+    assert.match(await document.text(), text);
+  }
   assert.match(home, /id="gateway-plans"[\s\S]*<h4>DEMO<\/h4>[\s\S]*<h4>START<\/h4>[\s\S]*<h4>PRO<\/h4>/);
   assert.match(home, /id="editor-plans"[\s\S]*<h4>DEMO SECRET<\/h4>[\s\S]*<h4>SECRET<\/h4>[\s\S]*<h4>SECRET\+<\/h4>[\s\S]*CUSTOM/);
   assert.match(home, /disabled>Выбрать PRO<\/button>/);
