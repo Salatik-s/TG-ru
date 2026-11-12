@@ -1,0 +1,27 @@
+name: Legacy preview compatibility
+
+on:
+  pull_request:
+    paths:
+      - 'server/**'
+      - 'tests/compat/**'
+      - '.github/workflows/compatibility.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  access-v1:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check C1 and C2 against the checkout
+        run: |
+          docker run --rm --read-only --network none --tmpfs /tmp:size=64m \
+            --user 1000:1000 --cap-drop ALL --security-opt no-new-privileges \
+            --volume "$PWD:/app:ro" --workdir /app \
+            node:24-bookworm-slim@sha256:c0a93797ee78814ae6d32fcca2561fdbbe423149c3f5389aad32d86e9fd85bd4 \
+            node --test tests/compat/preview.test.mjs
