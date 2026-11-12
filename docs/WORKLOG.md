@@ -1,5 +1,7 @@
 # Журнал работ по TG-ru
 
+**Продолжение от 12 ноября 2026.** Отдельные Billing и Web запущены локально, а код и доказательства проверок находятся в черновике PR-02. Для актуальной точки продолжения откройте журнал его ветки. [PR-02](https://github.com/Salatik-s/TG-ru/pull/5) · [Актуальный журнал](https://github.com/Salatik-s/TG-ru/blob/sukhovskiy.a.a/phase-0-services/docs/WORKLOG.md).
+
 ## Продолжение с другого аккаунта
 
 - Репозиторий `Salatik-s/TG-ru` приватный. Доступ определяется учётной записью GitHub отдельно от Codex. Рабочая копия фазы 0 на этом ПК находится в `C:\Users\andre\Documents\Codex\TG-ru-phase-0`.
