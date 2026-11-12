@@ -21,13 +21,17 @@ function json(response, status, payload) {
   response.end(JSON.stringify(payload));
 }
 
-function localUrl(request) {
+function storeUrl(request, publicOrigin) {
+  const host = request.headers.host ?? '';
+  const loopback = /^(?:127\.0\.0\.1|localhost)(?::[0-9]{1,5})?$/.test(host);
+  const https = publicOrigin && host === publicOrigin.host;
   if (request.socket.remoteAddress !== '127.0.0.1'
-      || !/^(?:127\.0\.0\.1|localhost)(?::[0-9]{1,5})?$/.test(request.headers.host ?? '')) {
+      || (!loopback && !https)) {
     throw new StoreError(400, 'invalid_host');
   }
-  const base = 'http://' + request.headers.host;
+  const base = https ? publicOrigin.origin : 'http://' + host;
   const url = new URL(request.url, base);
+  if (url.origin !== base) throw new StoreError(400, 'invalid_host');
   const site = request.headers['sec-fetch-site'];
   const origin = request.headers.origin;
   // Chrome/Edge may use a null Origin for native forms under Referrer-Policy: no-referrer.
@@ -75,12 +79,16 @@ function securityHeaders(response) {
   response.setHeader('Cache-Control', 'no-store');
 }
 
-export function createStoreServer({ pagesHandler, ...storeOptions } = {}) {
+export function createStoreServer({ pagesHandler, publicOrigin, ...storeOptions } = {}) {
+  if (publicOrigin && publicOrigin !== 'https://tg.24projects.ru') {
+    throw new Error('Invalid public Store origin');
+  }
+  const origin = publicOrigin ? new URL(publicOrigin) : null;
   const store = createStore(storeOptions);
   const server = createServer(async (request, response) => {
     securityHeaders(response);
     try {
-      const url = localUrl(request);
+      const url = storeUrl(request, origin);
       const path = url.pathname;
       store.purge();
       if (path === '/health' && request.method === 'GET') {

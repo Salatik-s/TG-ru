@@ -6,6 +6,8 @@
 
 Текущая сборка использует закреплённый APK exteraless и компилирует собственные Java/Go/C++-добавления. Это не завершённая полная сборка upstream через Gradle. Скрипты промежуточных preview применяются в своём порядке и требуют соответствующего базового артефакта с точной контрольной суммой. Нельзя подставить произвольный похожий APK и считать результат эквивалентным.
 
+Для Store preview22 базой служит проверенный preview20. Декодируйте его Apktool с `--no-src` в `build-support/work-store-10023/decoded`. Запустите `build-support/prepare_store_preview.py --base <preview20.apk> --work build-support/work-store-10023` и соберите ресурсы Apktool в `rebuilt-unsigned.apk` внутри рабочего каталога. Передайте SHA-256 этого файла и рабочий каталог в `repack_overlay.py`, затем подпишите полученный `SAA-UNSIGNED.apk` через `build-support/Sign.ps1`. Для QA используется локальный кабинет по USB. Параметр `--public` на шаге подготовки выбирает рабочий HTTPS и исключает разрешение на loopback HTTP. [Параметры шлюза](STORE-GATEWAY.md)
+
 ## Инструменты
 
 Использованы Windows PowerShell, Python 3, JDK с javac 17, Android SDK Platform 35 / Build Tools 37.0.0, D8, AAPT2, zipalign, apksigner, Apktool 3.0.3, Go и Android NDK для нативных библиотек. Потребуются инструменты и зависимости, указанные в README каталогов `native`, `tunnel`, `calls`, `build-support`.

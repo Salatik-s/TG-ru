@@ -5,6 +5,7 @@ import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.os.Build;
+import android.os.SystemClock;
 import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
 import android.util.Base64;
@@ -33,19 +34,24 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
-/** Loopback-only Store flow for the explicitly marked Android QA build. */
+/** Installation-bound access for the Store edition. */
 public final class FamilyStoreAccess {
     public static final String QA_MARKER = "org.telegram.messenger.family.STORE_LOCAL_QA";
+    public static final String STORE_MARKER = "org.telegram.messenger.family.STORE";
     static final String LOCAL_ORIGIN = "http://127.0.0.1:48185";
+    private static final String PUBLIC_ORIGIN = "https://tg.24projects.ru";
+    private static final int REALITY_PORT = 28443;
     private static final String KEY_ALIAS = "tg-ru-store-local-device-v1";
     private static final String PREFS = "tg_ru_store_local_qa";
     private static final String DEVICE_ID = "device_id";
     private static final String ACCESS_UNTIL = "access_until";
-    private static final String LEASE_UNTIL = "lease_until";
     private static final Pattern TOKEN = Pattern.compile("[a-zA-Z0-9_-]{43}");
     private static final Pattern FINGERPRINT = Pattern.compile("[0-9a-f]{64}");
     private static final int MAX_RESPONSE = 16 * 1024;
     private static volatile Boolean configured;
+    private static volatile boolean local;
+    private static volatile long allowedUntil;
+    private static String activeGateway;
     private static final AtomicBoolean refreshStarted = new AtomicBoolean();
 
     private FamilyStoreAccess() { }
@@ -56,7 +62,8 @@ public final class FamilyStoreAccess {
         try {
             ApplicationInfo info = context.getPackageManager().getApplicationInfo(
                     context.getPackageName(), PackageManager.GET_META_DATA);
-            cached = info.metaData != null && info.metaData.getBoolean(QA_MARKER, false);
+            local = info.metaData != null && info.metaData.getBoolean(QA_MARKER, false);
+            cached = info.metaData != null && info.metaData.getBoolean(STORE_MARKER, false);
         } catch (PackageManager.NameNotFoundException ignored) {
             cached = false;
         }
@@ -66,7 +73,11 @@ public final class FamilyStoreAccess {
 
     public static boolean isActive(Context context) {
         if (!isConfigured(context)) return false;
-        return preferences(context).getLong(LEASE_UNTIL, 0) > now();
+        return allowedUntil > SystemClock.elapsedRealtime() && FamilyNative.isReady();
+    }
+
+    static String origin() {
+        return local ? LOCAL_ORIGIN : PUBLIC_ORIGIN;
     }
 
     public static long accessUntil(Context context) {
@@ -83,7 +94,7 @@ public final class FamilyStoreAccess {
             return thread;
         });
         loop.scheduleWithFixedDelay(() -> {
-            if (!hasDevice(app) || preferences(app).getLong(LEASE_UNTIL, 0) > now() + 30) return;
+            if (!hasDevice(app) || (isActive(app) && allowedUntil > SystemClock.elapsedRealtime() + 30_000)) return;
             try {
                 refresh(app);
             } catch (ActivationFailure ignored) {
@@ -141,7 +152,7 @@ public final class FamilyStoreAccess {
             return saveAccess(context, renewed, publicKey(store));
         } catch (ActivationFailure failure) {
             if ("subscription_expired".equals(failure.code)) {
-                preferences(context).edit().remove(LEASE_UNTIL).apply();
+                closeTransport();
             } else if ("device_revoked".equals(failure.code) || "device_not_found".equals(failure.code)) {
                 clearDevice(context);
             }
@@ -157,7 +168,14 @@ public final class FamilyStoreAccess {
     }
 
     private static void clearDevice(Context context) {
-        preferences(context).edit().remove(DEVICE_ID).remove(ACCESS_UNTIL).remove(LEASE_UNTIL).apply();
+        closeTransport();
+        preferences(context).edit().remove(DEVICE_ID).remove(ACCESS_UNTIL).apply();
+    }
+
+    private static void closeTransport() {
+        allowedUntil = 0;
+        activeGateway = null;
+        FamilyNative.stop();
     }
 
     private static KeyStore getDeviceKey(boolean create) throws GeneralSecurityException, IOException {
@@ -200,25 +218,47 @@ public final class FamilyStoreAccess {
             throw new ActivationFailure("bad_response");
         }
         long expiry = result.getLong(ACCESS_UNTIL);
-        long current = now();
-        if (expiry <= current) {
+        long serverTime = result.getLong("server_time");
+        if (expiry <= serverTime) {
             throw new ActivationFailure("subscription_required");
         }
-        long lease = Math.min(result.getLong(LEASE_UNTIL), current + 75);
-        if (lease <= current || lease > expiry) throw new ActivationFailure("bad_response");
+        long lease = result.getLong("lease_until");
+        long seconds = lease - serverTime;
+        if (seconds <= 0 || seconds > 75 || lease > expiry) {
+            throw new ActivationFailure("bad_response");
+        }
+        String gateway;
+        try {
+            JSONObject profile = FamilyAccess.validGateway(result.getJSONObject("gateway"));
+            if (!"reality".equals(profile.getString("security"))
+                    || !(local ? "127.0.0.1" : "tg.24projects.ru").equals(profile.getString("host"))
+                    || profile.getInt("port") != REALITY_PORT) {
+                throw new ActivationFailure("bad_response");
+            }
+            gateway = profile.toString();
+        } catch (Exception invalid) {
+            throw new ActivationFailure("gateway_profile_invalid");
+        }
+        if ((!gateway.equals(activeGateway) || !isActive(context)) && FamilyNative.start(gateway) != 0) {
+            closeTransport();
+            throw new ActivationFailure("gateway_unavailable");
+        }
+        if (FamilyNative.renewLease((int) seconds) != 0 || !FamilyNative.isReady()) {
+            closeTransport();
+            throw new ActivationFailure("gateway_unavailable");
+        }
         if (!preferences(context).edit().putString(DEVICE_ID, deviceId)
-                .putLong(ACCESS_UNTIL, expiry).putLong(LEASE_UNTIL, lease).commit()) {
+                .putLong(ACCESS_UNTIL, expiry).commit()) {
+            closeTransport();
             throw new ActivationFailure("local_storage_unavailable");
         }
+        activeGateway = gateway;
+        allowedUntil = SystemClock.elapsedRealtime() + seconds * 1000L;
         return expiry;
     }
 
     private static SharedPreferences preferences(Context context) {
         return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-    }
-
-    private static long now() {
-        return System.currentTimeMillis() / 1000;
     }
 
     private static String deviceName() {
@@ -232,7 +272,7 @@ public final class FamilyStoreAccess {
 
     private static JSONObject post(String path, JSONObject request)
             throws IOException, JSONException, ActivationFailure {
-        URL url = validatedEndpoint(LOCAL_ORIGIN, path);
+        URL url = validatedEndpoint(origin(), path);
         HttpURLConnection connection = (HttpURLConnection) url.openConnection(Proxy.NO_PROXY);
         try {
             connection.setInstanceFollowRedirects(false);

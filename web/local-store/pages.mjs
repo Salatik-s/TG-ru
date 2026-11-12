@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 
 const staticFiles = new Map([
   ['/store.css', ['text/css; charset=utf-8', readFileSync(new URL('./store.css', import.meta.url))]],
+  ['/fonts/inter-cyrillic.woff2', ['font/woff2', readFileSync(new URL('./inter-cyrillic.woff2', import.meta.url))]],
+  ['/fonts/inter-latin.woff2', ['font/woff2', readFileSync(new URL('./inter-latin.woff2', import.meta.url))]],
   ['/store.mjs', ['text/javascript; charset=utf-8', readFileSync(new URL('./store.mjs', import.meta.url))]],
 ]);
 const strings = JSON.parse(readFileSync(new URL('../../i18n/ru.json', import.meta.url), 'utf8'));
@@ -17,7 +19,6 @@ const forms = new Map([
 const supportLink = 'https://t.me/prince_skazki';
 
 const paths = {
-  brand: '<path d="M5 12h14m-6-6 6 6-6 6M5 6v12"/>',
   phone: '<rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 17h2"/>',
   relay: '<rect x="4" y="4" width="16" height="6" rx="1"/><rect x="4" y="14" width="16" height="6" rx="1"/><path d="M8 7h.01M8 17h.01m4-10h4m-4 10h4"/>',
   chat: '<path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l1.3-3.6A7.5 7.5 0 1 1 20 11.5Z"/><path d="M9 11.5h6"/>',
@@ -66,11 +67,9 @@ function errorNotice(error) {
 function layout(title, content, { session, route, marketing = false } = {}) {
   const account = session?.account;
   const navLink = (href, name) => `<a href="${href}"${route === href ? ' aria-current="page"' : ''}>${name}</a>`;
-  const nav = marketing
-    ? '<a href="/#how">Как это работает</a><a href="/visibility">Что мы видим</a><a href="/#price">Цена</a>'
-    : account
-      ? navLink('/cabinet', 'Обзор') + navLink('/devices', 'Устройства') + navLink('/downloads', 'Загрузки') + navLink('/help', 'Помощь')
-      : '<a href="/#how">Как это работает</a>' + navLink('/visibility', 'Что мы видим');
+  const nav = marketing || !account
+    ? '<a href="/#how">Как это работает</a>' + navLink('/visibility', 'Что мы видим') + '<a href="/#price">Цена</a>'
+    : navLink('/cabinet', 'Обзор') + navLink('/devices', 'Устройства') + navLink('/downloads', 'Загрузки') + navLink('/help', 'Помощь');
   const sessionLinks = account
     ? (marketing ? action('/cabinet', 'Кабинет', 'primary') : `<form method="post" action="/form/logout">${csrf(session)}${formButton('Выйти', 'ghost')}</form>`)
     : `${route === '/login' ? '' : action('/login', 'Войти', 'ghost')}${route === '/register' ? '' : action('/register', 'Создать аккаунт', 'primary')}`;
@@ -80,7 +79,7 @@ function layout(title, content, { session, route, marketing = false } = {}) {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="TG-ru — независимый Android-клиент Telegram с подпиской на доступ к шлюзу.">
-  <meta name="color-scheme" content="light dark">
+  <meta name="color-scheme" content="dark light">
   <title>${escapeHtml(title)} · TG-ru</title>
   <script src="/store.mjs"></script>
   <link rel="stylesheet" href="/store.css">
@@ -89,7 +88,7 @@ function layout(title, content, { session, route, marketing = false } = {}) {
   <a class="skip" href="#content">Перейти к содержимому</a>
   <header class="site-header">
     <div class="wrap topbar">
-      <a class="brand" href="/" aria-label="TG-ru, главная"><span class="brand-icon">${icon('brand')}</span>TG-ru</a>
+      <a class="brand" href="/" aria-label="TG-ru, главная"><span class="brand-icon" aria-hidden="true">TG</span>TG-ru</a>
       <nav aria-label="Основная навигация">${nav}</nav>
       <div class="session-links">${sessionLinks}</div>
     </div>
@@ -98,7 +97,6 @@ function layout(title, content, { session, route, marketing = false } = {}) {
   <footer class="site-footer">
     <div class="wrap footer-inner">
       <div class="footer-main">
-        <a class="brand" href="/"><span class="brand-icon">${icon('brand')}</span>TG-ru</a>
         <p>${strings.site.disclaimer}</p>
       </div>
       <nav aria-label="Информация о сервисе">
@@ -132,7 +130,7 @@ function home(session) {
     <p>Логин TG-ru нужен для доступа к шлюзу. В Telegram вы входите отдельно в приложении.</p>
   </figure>
 </section>
-<section id="how" class="wrap band split">
+<section id="how" class="wrap band">
   <h2>Как это работает</h2>
   <ol class="steps">
     <li><span>1</span><div><h3>Создайте аккаунт TG-ru</h3><p>Начните бесплатную пробу на 5 часов. За дальнейшим доступом можно обратиться в поддержку.</p></div></li>
@@ -145,17 +143,25 @@ function home(session) {
   ${visibilitySummary()}
   <a class="text-link" href="/visibility">Подробнее о данных ${icon('arrow')}</a>
 </section>
-<section id="price" class="wrap band split">
+<section id="price" class="wrap band">
   <h2>Цена</h2>
-  <div class="price-panel">
-    <p class="price"><strong>199 ₽</strong> в месяц</p>
-    <p>Без автоматического списания: продлевать вы решаете сами.</p>
-    <p>До трёх устройств. Первые 5 часов бесплатно.</p>
-    <p>Онлайн-оплата пока недоступна. <a href="${supportLink}">Написать в поддержку</a>.</p>
-    ${action(session.account ? '/cabinet' : '/register', session.account ? 'Открыть кабинет' : 'Создать аккаунт', 'primary')}
+  <div class="price-grid">
+    <article class="price-panel">
+      <h3>Пробный доступ</h3>
+      <p class="price"><strong>0 ₽</strong> на 5 часов</p>
+      <p>Один пробный период на аккаунт. Карта не нужна.</p>
+      ${action(session.account ? '/cabinet' : '/register', 'Попробовать бесплатно')}
+    </article>
+    <article class="price-panel price-featured">
+      <h3>Доступ к шлюзу</h3>
+      <p class="price"><strong>199 ₽</strong> за 30 дней</p>
+      <p>До трёх устройств. Без автоматических списаний.</p>
+      ${action(session.account ? '/checkout' : '/register', 'Получить доступ', 'primary')}
+    </article>
   </div>
+  <p class="pricing-note">Онлайн-оплата пока недоступна. <a href="${supportLink}">Написать в поддержку</a>.</p>
 </section>
-<section class="wrap band split">
+<section class="wrap band">
   <h2>Частые вопросы</h2>
   <div class="faq">
     <details><summary>Это официальный Telegram?</summary><p>Нет. TG-ru — неофициальный клиент. Telegram не связан с этим сервисом.</p></details>
@@ -179,9 +185,9 @@ function credentialsPage(route, session, { error, login = '' } = {}) {
   const fieldHint = registering ? '<small id="login-hint">3–24 символа: латиница, цифры, _</small>' : '';
   return layout(title, `
 <section class="wrap form-page">
-  <div class="form-intro"><h1>${title}</h1>
-  <p>${registering ? 'Аккаунт TG-ru нужен для доступа к шлюзу. После регистрации можно начать пробу на 5 часов.' : 'Войдите в кабинет TG-ru, чтобы посмотреть срок доступа и подключённые устройства.'}</p></div>
   <form class="form-card" method="post" action="/form/${registering ? 'register' : 'login'}">
+    <div class="form-intro"><h1>${title}</h1>
+    <p>${registering ? 'Аккаунт TG-ru нужен для доступа к шлюзу. После регистрации можно начать пробу на 5 часов.' : 'Войдите в кабинет TG-ru, чтобы посмотреть срок доступа и подключённые устройства.'}</p></div>
     ${csrf(session)}${errorNotice(error)}
     <div class="field"><label for="login">Логин</label><input id="login" name="login" autocomplete="username" autocapitalize="none" spellcheck="false" required maxlength="24" value="${escapeHtml(login)}" ${registering ? 'minlength="3" pattern="[a-zA-Z0-9_]{3,24}" aria-describedby="login-hint"' : ''}>${fieldHint}</div>
     <div class="field"><label for="password">Пароль</label><div class="password"><input id="password" name="password" type="password" autocomplete="${registering ? 'new-password' : 'current-password'}" required maxlength="256" ${registering ? 'minlength="12" aria-describedby="password-hint"' : ''}><button type="button" class="button ghost" data-password="password" aria-pressed="false" hidden>Показать</button></div>${registering ? '<small id="password-hint">Не короче 12 символов</small><button class="button ghost generate" type="button" data-generate="password" hidden>Сгенерировать пароль</button>' : '<a href="/recover">Забыли пароль?</a>'}</div>
@@ -221,42 +227,65 @@ function recover(session, error) {
 </section>`, { session, route: '/recover' });
 }
 
-function status(session, now) {
-  const { trial_started_at, trial_until, paid_until, manual_until = 0, access_until } = session.account;
-  if (paid_until > now) {
-    const days = Math.ceil((paid_until - now) / 86400);
+function accessStatus(account, now) {
+  const paidUntil = account.paid_until || 0;
+  const manualUntil = account.manual_until || 0;
+  const trialUntil = account.trial_until || 0;
+  const until = Math.max(paidUntil, manualUntil, trialUntil);
+  if (until <= now) return { until, active: false, trialAvailable: !account.trial_started_at && !until };
+  const label = until === paidUntil ? 'Подписка активна' : until === manualUntil ? 'Доступ выдан поддержкой' : 'Пробный период';
+  return { until, active: true, label };
+}
+
+function status(session, now, access) {
+  if (access.active) {
+    const remaining = access.until - now;
+    const days = Math.ceil(remaining / 86400);
     const word = { one: 'день', few: 'дня', many: 'дней' }[plural.select(days)];
-    return `<div class="status-line">${badge('Активна', 'success')}<span>Действует до ${formatDate(paid_until)} (МСК)</span></div>
-      <p>Осталось ${days} ${word}.</p>${action('/checkout', 'Продлить доступ', 'primary')}`;
+    const detail = remaining >= 86400 ? `Осталось ${days} ${word}.` : 'Точное время окончания указано по Москве.';
+    return `<h2 class="access-title">До ${formatDate(access.until)}</h2><p>${detail}</p>
+      ${action('/checkout', 'Продлить доступ', 'primary')}`;
   }
-  if (manual_until > now) {
-    return `<div class="status-line">${badge('Доступ выдан поддержкой', 'success')}<span>До ${formatDate(manual_until)} (МСК)</span></div>
-      <p>Установите приложение на Android и войдите с логином и паролем TG-ru.</p>${action('/checkout', 'Продлить доступ', 'primary')}`;
+  if (access.trialAvailable) {
+    return `<h2 class="access-title">Начните с 5 часов бесплатно</h2><p>Пробный период начнётся сразу после нажатия. Карта не нужна.</p>
+      <div class="actions"><form method="post" action="/form/trial">${csrf(session)}${formButton('Попробовать 5 часов бесплатно')}</form>
+      ${action('/checkout', 'Получить доступ')}</div>`;
   }
-  if (trial_until > now) {
-    return `<div class="status-line">${badge('Пробный период', 'success')}<span>До ${formatDate(trial_until)} (МСК)</span></div>
-      <p>Установите приложение на Android и войдите с логином и паролем TG-ru.</p>${action('/checkout', 'Продлить доступ', 'primary')}`;
-  }
-  if (!trial_started_at && !paid_until && !manual_until) {
-    return `<p>У вас пока нет подписки. Начните пробу на 5 часов без карты.</p>
-      <form method="post" action="/form/trial" class="inline-form">${csrf(session)}${formButton('Попробовать 5 часов бесплатно')}</form>
-      ${action('/checkout', 'Получить доступ', 'ghost')}`;
-  }
-  const ended = access_until || Math.max(trial_until || 0, paid_until, manual_until);
-  return `<div class="status-line">${badge('Закончилась', 'warning')}${ended ? `<span>Доступ закончился ${formatDate(ended)} (МСК)</span>` : ''}</div>
+  return `<h2 class="access-title">Срок доступа истёк</h2>
+    ${access.until ? `<p>Доступ закончился ${formatDate(access.until)} (МСК).</p>` : ''}
     ${action('/checkout', 'Получить доступ', 'primary')}`;
 }
 
+function deviceSummary(device) {
+  return `<span class="route-icon">${icon('phone')}</span><div class="device-name"><strong>${escapeHtml(device.name)}</strong><p>Store · привязано ${formatDate(device.activated_at)} (МСК)</p></div>`;
+}
+
 function cabinet(session, error, now) {
-  const deviceCount = session.account.devices.length;
+  const { devices, login } = session.account;
+  const access = accessStatus(session.account, now);
   return layout('Кабинет', `
-<section class="wrap dashboard">
-  <div class="page-heading"><h1>Кабинет</h1><p>Вы вошли как <strong>${escapeHtml(session.account.login)}</strong></p></div>
+<section class="wrap dashboard dashboard-overview">
+  <div class="page-heading"><div><h1>Кабинет</h1><p>Вы вошли как <strong>${escapeHtml(login)}</strong></p></div>
+    ${access.active ? badge(access.label, 'success') : access.trialAvailable ? '' : badge('Доступ закончился', 'warning')}</div>
   ${errorNotice(error)}
-  <section class="dashboard-row"><div><h2>Подписка</h2><p>Доступ к шлюзу TG-ru</p></div><div>${status(session, now)}</div></section>
-  <section class="dashboard-row"><div><h2>Устройства</h2><p>До трёх телефонов</p></div><div><p class="metric">Подключено ${deviceCount} из 3</p>${action('/devices', 'Управлять')}</div></section>
-  <section class="dashboard-row"><div><h2>Приложение</h2><p>Android</p></div><div><p>Скачайте приложение и введите логин и пароль на первом экране.</p>${action('/downloads', 'К загрузкам')}</div></section>
-  <p class="subtle"><a href="/help">Помощь с доступом</a></p>
+  <div class="dashboard-grid">
+    <div class="dashboard-stack">
+      <section class="dashboard-card subscription-card" aria-label="Доступ к шлюзу TG-ru">
+        ${status(session, now, access)}
+      </section>
+      <section class="dashboard-card">
+        <div class="dashboard-card-heading"><h2>Устройства</h2><p>Подключено ${devices.length} из 3</p></div>
+        ${devices.length ? `<ul class="device-overview-list">${devices.map((device) => `<li>${deviceSummary(device)}</li>`).join('')}</ul>` : '<p>Устройств пока нет. Войдите в TG-ru на Android, чтобы подключить первое.</p>'}
+        ${action('/devices', 'Управлять устройствами')}
+      </section>
+    </div>
+    <div class="dashboard-stack dashboard-aside">
+      <section class="dashboard-card"><h2>Приложение</h2><p>TG-ru для Android. После установки введите логин и пароль на первом экране.</p>
+        ${action('/downloads', 'К загрузкам', 'primary')}</section>
+      <section class="dashboard-card"><h2>Помощь</h2><p>Если доступ не появился или возникла проблема с подключением, напишите в поддержку.</p>
+        ${action('/help', 'Помощь с доступом')}</section>
+    </div>
+  </div>
 </section>`, { session, route: '/cabinet' });
 }
 
@@ -267,7 +296,7 @@ function devices(session, error) {
   <div class="page-heading"><h1>Устройства</h1><p>Подключено ${items.length} из 3</p></div>
   ${errorNotice(error)}
   ${items.length === 3 ? `<p class="notice" role="status">${icon('info')}Достигнут лимит в 3 устройства. Отвяжите одно, чтобы подключить новое.</p>` : ''}
-  ${items.length ? `<ul class="device-list">${items.map((device) => `<li><span class="route-icon">${icon('phone')}</span><div class="device-name"><strong>${escapeHtml(device.name)}</strong><p>Store · ${formatDate(device.activated_at)} (МСК)</p></div><details class="revoke"><summary>Отвязать</summary><p>Приложение на нём потеряет доступ. Вы сможете привязать его снова.</p><form method="post" action="/form/devices/revoke">${csrf(session)}${input('device_id', device.id)}${formButton('Подтвердить отвязку', 'danger')}</form></details></li>`).join('')}</ul>` : `
+  ${items.length ? `<ul class="device-list">${items.map((device) => `<li>${deviceSummary(device)}<details class="revoke"><summary>Отвязать</summary><p>Приложение на нём потеряет доступ. Вы сможете привязать его снова.</p><form method="post" action="/form/devices/revoke">${csrf(session)}${input('device_id', device.id)}${formButton('Подтвердить отвязку', 'danger')}</form></details></li>`).join('')}</ul>` : `
   <div class="empty"><span class="route-icon">${icon('phone')}</span><h2>Устройств пока нет</h2><p>Скачайте приложение и введите логин и пароль TG-ru.</p>${action('/downloads', 'К загрузкам', 'primary')}</div>`}
   <p class="subtle"><a href="/cabinet">К обзору</a></p>
 </section>`, { session, route: '/devices' });
@@ -275,12 +304,11 @@ function devices(session, error) {
 
 function checkout(session) {
   return layout('Оплата', `
-<section class="wrap form-page">
-  <div class="form-intro"><h1>Оплата подписки</h1><p>199 ₽ за 30 дней. Автоматического списания нет.</p></div>
+<section class="wrap form-page checkout-page">
   <div class="form-card">
+    <div class="form-intro"><h1>Оплата подписки</h1><p>199 ₽ за 30 дней. Автоматического списания нет.</p></div>
     <p class="notice" role="status">${icon('info')}Оплата временно недоступна. Для получения доступа обратитесь в поддержку.</p>
-    ${action(supportLink, 'Написать в поддержку', 'primary')}
-    <a href="/cabinet">К обзору</a>
+    <div class="actions">${action(supportLink, 'Написать в поддержку', 'primary')}${action('/cabinet', 'К обзору')}</div>
   </div>
 </section>`, { session, route: '/checkout' });
 }

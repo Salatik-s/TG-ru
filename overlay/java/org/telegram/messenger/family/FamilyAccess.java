@@ -110,7 +110,10 @@ public final class FamilyAccess {
     public static boolean previouslyApproved() { return previouslyApproved; }
     static boolean hasCachedAccount() {
         Context context = applicationContext;
-        if (!previouslyApproved || context == null) return false;
+        return previouslyApproved && hasCachedTelegramAccount(context);
+    }
+    static boolean hasCachedTelegramAccount(Context context) {
+        if (context == null) return false;
         if (context.getSharedPreferences("userconfing", Context.MODE_PRIVATE).contains("user")) return true;
         for (int slot = 1; slot < 10; slot++) {
             if (context.getSharedPreferences("userconfig" + slot, Context.MODE_PRIVATE).contains("user")) return true;
@@ -126,6 +129,9 @@ public final class FamilyAccess {
     }
     public static boolean isPhoneOwner() { return phoneOwner && isAllowed(); }
     public static boolean isAllowed() {
+        if (applicationContext != null && FamilyStoreAccess.isConfigured(applicationContext)) {
+            return FamilyStoreAccess.isActive(applicationContext);
+        }
         return allowedUntil > SystemClock.elapsedRealtime() && nativeReady();
     }
     private static boolean nativeReady() {
@@ -166,11 +172,13 @@ public final class FamilyAccess {
     public static void connect() { begin("config", null, true); }
 
     static synchronized void resumeConnection() {
+        if (applicationContext != null && FamilyStoreAccess.isConfigured(applicationContext)) return;
         if (previouslyApproved && !isAllowed() && snapshot.retrySeconds() == 0
                 && FamilyConnectionMonitor.hasNetwork()) connect();
     }
 
     static synchronized void reportTransportState(int state) {
+        if (applicationContext != null && FamilyStoreAccess.isConfigured(applicationContext)) return;
         boolean connecting = routeFailoverEnabled() && (state == 1 || state == 4)
                 && isAllowed() && FamilyConnectionMonitor.hasNetwork();
         if (routeFailover.observe(connecting, SystemClock.elapsedRealtime()))
@@ -202,8 +210,7 @@ public final class FamilyAccess {
 
     private static synchronized void begin(String action, String code, boolean openTunnel) {
         if (preferences == null || snapshot.busy) return;
-        if (openTunnel && FamilyStoreAccess.isConfigured(applicationContext)
-                && !FamilyStoreAccess.isActive(applicationContext)) return;
+        if (FamilyStoreAccess.isConfigured(applicationContext)) return;
         if (action.equals("invite") && snapshot.retrySeconds() > 0) return;
         long epoch = EPOCH.get();
         String endpoint = server;
@@ -454,7 +461,7 @@ public final class FamilyAccess {
         return fallback ? validGateway(response.getJSONObject("gateway")) : primary;
     }
 
-    private static JSONObject validGateway(JSONObject source) throws Exception {
+    static JSONObject validGateway(JSONObject source) throws Exception {
         if (!source.getString("protocol").equals("vless")) {
             throw new AccessFailure("invalid_gateway", 0);
         }

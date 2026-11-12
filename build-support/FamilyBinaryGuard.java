@@ -48,7 +48,7 @@ public final class FamilyBinaryGuard implements Application.ActivityLifecycleCal
     }
 
     private static boolean hasStoreChatCache(Context context) {
-        return FamilyAccess.hasCachedAccount()
+        return FamilyAccess.hasCachedTelegramAccount(context)
                 && FamilyStoreAccess.accessUntil(context) > System.currentTimeMillis() / 1000;
     }
 
@@ -93,10 +93,7 @@ public final class FamilyBinaryGuard implements Application.ActivityLifecycleCal
                 boolean active = FamilyStoreAccess.isActive(application);
                 Activity activity = foreground.get();
                 if (!active) {
-                    if (FamilyAccess.isAllowed()) FamilyAccess.disconnect();
                     if (activity != null && !canShow(activity)) redirect(activity);
-                } else if (!wasActive && activity != null && activity.getClass().getName().equals(LAUNCHER)) {
-                    FamilyAccess.resumeConnection();
                 }
                 if (active != wasActive) refreshConnectionHeader();
                 wasActive = active;
@@ -118,7 +115,7 @@ public final class FamilyBinaryGuard implements Application.ActivityLifecycleCal
             activity.getWindow().getDecorView().post(() -> {
                 if (foreground.get() != activity) return;
                 refreshConnectionHeader();
-                FamilyRouteConsent.maybeAsk(activity);
+                if (!FamilyStoreAccess.isConfigured(activity)) FamilyRouteConsent.maybeAsk(activity);
             });
         }
     }

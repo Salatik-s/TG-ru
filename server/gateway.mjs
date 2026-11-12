@@ -3,22 +3,34 @@ import { writeFileSync, renameSync } from 'node:fs';
 import { createConnection } from 'node:net';
 import { setTimeout as delay } from 'node:timers/promises';
 
-export function xrayConfig(config, devices, route=null, {allowDirectForTests=false}={}) {
+export function xrayConfig(config, devices, route=null, {
+  allowDirectForTests=false, realityPort=18443, listenAddress='0.0.0.0', realityOnly=false, destinationCidrs=null,
+  qaStatsPort=null, qaSocksPort=null
+}={}) {
   const outbound=route?.outbound?structuredClone(route.outbound):null;
   if(outbound&&!['vless','trojan','shadowsocks'].includes(outbound.protocol))throw new Error('Invalid encrypted egress');
   if(outbound)outbound.tag='family-egress';
-  const selected=outbound?'family-egress':allowDirectForTests?'test-direct':'block';
+  const qaOutbound=qaSocksPort?{tag:'test-socks',protocol:'socks',settings:{servers:[{address:'127.0.0.1',port:qaSocksPort}]}}
+    :{tag:'test-direct',protocol:'freedom',settings:{domainStrategy:'UseIP'}};
+  const selected=outbound?'family-egress':allowDirectForTests?qaOutbound.tag:'block';
   return {
     log: {loglevel:'warning'},
-    inbounds:[{tag:'family-reality',listen:'0.0.0.0',port:18443,protocol:'vless',settings:{clients:devices.map(d=>({id:d.uuid,flow:'xtls-rprx-vision'})),decryption:'none'},
+    ...(qaStatsPort?{
+      stats:{},
+      api:{tag:'qa-stats',listen:`127.0.0.1:${qaStatsPort}`,services:['StatsService']},
+      policy:{system:{statsOutboundUplink:true,statsOutboundDownlink:true}}
+    }:{}),
+    inbounds:[{tag:'family-reality',listen:listenAddress,port:realityPort,protocol:'vless',settings:{clients:devices.map(d=>({id:d.uuid,flow:'xtls-rprx-vision'})),decryption:'none'},
       streamSettings:{network:'tcp',security:'reality',realitySettings:{show:false,target:`${config.serverName}:443`,xver:0,serverNames:[config.serverName],privateKey:config.privateKey,shortIds:[config.shortId]}},
       sniffing:{enabled:true,destOverride:['http','tls'],routeOnly:true}},
       // TLS terminates at the existing HTTPS nginx. This port is container-network only.
-      {tag:'family-ws',listen:'0.0.0.0',port:10000,protocol:'vless',settings:{clients:devices.map(d=>({id:d.uuid})),decryption:'none'},
+      ...(realityOnly?[]:[{tag:'family-ws',listen:'0.0.0.0',port:10000,protocol:'vless',settings:{clients:devices.map(d=>({id:d.uuid})),decryption:'none'},
         streamSettings:{network:'ws',security:'none',wsSettings:{path:'/v1/transport'}},
-        sniffing:{enabled:true,destOverride:['http','tls'],routeOnly:true}}],
-    outbounds:[{tag:'block',protocol:'blackhole'},...(outbound?[outbound]:allowDirectForTests?[{tag:'test-direct',protocol:'freedom',settings:{domainStrategy:'UseIP'}}]:[])],
-    routing:{domainStrategy:'IPIfNonMatch',rules:[
+        sniffing:{enabled:true,destOverride:['http','tls'],routeOnly:true}}])],
+    outbounds:[{tag:'block',protocol:'blackhole'},...(outbound?[outbound]:allowDirectForTests?[qaOutbound]:[])],
+    routing:destinationCidrs?{domainStrategy:'AsIs',rules:[
+      {type:'field',ip:destinationCidrs,network:'tcp,udp',outboundTag:selected}
+    ]}:{domainStrategy:'IPIfNonMatch',rules:[
       {type:'field',domain:['localhost','domain:local','domain:internal'],outboundTag:'block'},
       {type:'field',ip:['0.0.0.0/8','10.0.0.0/8','100.64.0.0/10','127.0.0.0/8','169.254.0.0/16','172.16.0.0/12','192.168.0.0/16','224.0.0.0/4','240.0.0.0/4','::/128','::1/128','fc00::/7','fe80::/10','ff00::/8'],outboundTag:'block'},
       {type:'field',network:'tcp,udp',outboundTag:selected}]}
@@ -30,7 +42,7 @@ export class Gateway {
   async stopChild() {
     this.ready=false;this.listening=false;
     const child=this.child; if (!child) return;
-    if (child.exitCode === null) {
+    if (child.pid && child.exitCode === null && child.signalCode === null) {
       const exited=new Promise(resolve=>child.once('exit',resolve));
       child.kill('SIGTERM');
       await Promise.race([exited,delay(3000)]);
@@ -65,7 +77,7 @@ export class Gateway {
   async launch(devices,route,revision) {
     const path=`${this.dir}/xray.json`;
     writeFileSync(`${path}.tmp`,JSON.stringify(xrayConfig(this.config,devices,route,this.options)),{mode:0o600}); renameSync(`${path}.tmp`,path);
-    const child=this.child=spawn(this.binary,['run','-config',path],{stdio:['ignore','ignore','ignore']});
+    const child=this.child=spawn(this.binary,['run','-config',path],{stdio:['ignore','ignore','ignore'],windowsHide:true});
     let failed=false;
     const ended=()=>{failed=true;if(this.child===child){this.ready=false;this.listening=false;}};
     child.once('error',ended);child.once('exit',ended);
@@ -73,13 +85,14 @@ export class Gateway {
       await delay(100);
       if(this.closed||revision!==this.revision)return;
       if (failed) throw new Error('Gateway failed to start');
-      const listening=await Promise.all([18443,10000].map(port=>new Promise(resolve=>{const s=createConnection({host:'127.0.0.1',port});s.once('connect',()=>{s.destroy();resolve(true);});s.once('error',()=>resolve(false));s.setTimeout(100,()=>{s.destroy();resolve(false);});})));
+      const ports=this.options.realityOnly?[this.options.realityPort??18443]:[this.options.realityPort??18443,10000];
+      const listening=await Promise.all(ports.map(port=>new Promise(resolve=>{const s=createConnection({host:'127.0.0.1',port});s.once('connect',()=>{s.destroy();resolve(true);});s.once('error',()=>resolve(false));s.setTimeout(100,()=>{s.destroy();resolve(false);});})));
       if (listening.every(Boolean)) {this.listening=true;this.ready=Boolean(route?.outbound||this.options.allowDirectForTests);return;}
     }
     throw new Error('Gateway readiness timed out');
   }
   client(device) {
-    return {protocol:'vless',host:this.config.host,port:18443,uuid:device.uuid,security:'reality',public_key:this.config.publicKey,short_id:this.config.shortId,server_name:this.config.serverName,flow:'xtls-rprx-vision',fingerprint:'chrome'};
+    return {protocol:'vless',host:this.config.host,port:this.options.realityPort??18443,uuid:device.uuid,security:'reality',public_key:this.config.publicKey,short_id:this.config.shortId,server_name:this.config.serverName,flow:'xtls-rprx-vision',fingerprint:'chrome'};
   }
   clientFallbacks(device) {
     return [{protocol:'vless',host:this.config.host,port:8443,uuid:device.uuid,security:'tls',transport:'ws',path:'/v1/transport',server_name:this.config.host,flow:'',fingerprint:''}];

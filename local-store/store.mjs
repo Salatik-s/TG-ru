@@ -173,6 +173,7 @@ export function createStore({
   database = ':memory:',
   now = () => Math.floor(Date.now() / 1000),
   allowMockPurchases = false,
+  authorizeGateway,
 } = {}) {
   const db = localDatabase(database);
   const csrfKey = randomBytes(32);
@@ -548,7 +549,7 @@ export function createStore({
         return issueChallenge('activate', account.id);
       }
       case 'activate':
-        return finishActivation(data);
+        return transportLease(finishActivation(data));
       case 'device/challenge': {
         require(typeof data.device_id === 'string' && DEVICE_ID_PATTERN.test(data.device_id), 400, 'bad_request');
         const device = db.prepare('SELECT account_id FROM devices WHERE id=?').get(data.device_id);
@@ -556,10 +557,16 @@ export function createStore({
         return issueChallenge('renew', device.account_id, data.device_id);
       }
       case 'device/renew':
-        return finishRenewal(data);
+        return transportLease(finishRenewal(data));
       default:
         throw new StoreError(404, 'not_found');
     }
+  }
+
+  async function transportLease(grant) {
+    if (!authorizeGateway) return grant;
+    const gateway = await authorizeGateway(grant);
+    return { ...grant, gateway, server_time: now() };
   }
 
   return {

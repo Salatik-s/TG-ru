@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
-import { generateKeyPairSync, randomBytes, sign } from 'node:crypto';
+import { createHmac, generateKeyPairSync, randomBytes, sign } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync, rmdirSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { test } from 'node:test';
 import { createStoreServer } from './http.mjs';
 import { grantStoreAccess } from './store.mjs';
+import { gatewayClient } from './gateway-client.mjs';
 
 const password = () => 'Testing_' + randomBytes(18).toString('base64url');
 const credentials = () => ({ login: 'tester', password: password() });
@@ -129,6 +131,51 @@ test('trial lasts exactly five hours and simultaneous or subsequent requests kee
   const retry = (await client.request('trial', {})).body;
   assert.equal(retry.account.active, false);
   assert.equal(retry.account.trial_started_at, started);
+});
+
+test('the Store forwards only verified lease claims and fails closed when the gateway is unavailable', async (t) => {
+  const secret = randomBytes(32);
+  const claims = [];
+  let gatewayReady = true;
+  const gateway = { protocol: 'vless', security: 'reality', host: '127.0.0.1' };
+  const control = createServer(async (request, response) => {
+    const chunks = [];
+    for await (const chunk of request) chunks.push(chunk);
+    const body = Buffer.concat(chunks).toString('utf8');
+    const time = request.headers['x-store-time'];
+    const nonce = request.headers['x-store-nonce'];
+    const signature = createHmac('sha256', secret).update(`${time}\n${nonce}\n${body}`).digest('hex');
+    assert.equal(request.url, '/internal/store/lease');
+    assert.match(nonce, /^[0-9a-f]{32}$/);
+    assert.equal(request.headers['x-store-signature'], signature);
+    claims.push(JSON.parse(body));
+    response.writeHead(gatewayReady ? 200 : 503, { 'content-type': 'application/json' });
+    response.end(JSON.stringify({ gateway }));
+  });
+  await new Promise((resolve) => control.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise((resolve) => control.close(resolve)));
+  const authorizeGateway = gatewayClient({ secret: secret.toString('hex'), port: control.address().port });
+  const { browser, signup, now } = await fixture(t, { authorizeGateway });
+  const web = browser();
+  const { login } = await signup(web);
+  const android = browser();
+  assert.equal((await android.request('activation-token', login)).status, 403);
+  assert.equal(claims.length, 0);
+  await web.request('trial', {});
+  const device = installation();
+  const challenge = (await android.request('activation-token', login)).body;
+  const proof = device.activation(challenge);
+  const activated = (await android.request('activate', proof)).body;
+  assert.deepEqual(activated.gateway, gateway);
+  assert.equal((await android.request('activate', proof)).status, 400);
+  assert.deepEqual(claims, [{ device_id: activated.device_id, access_until: now() + 18000, lease_until: now() + 75 }]);
+  gatewayReady = false;
+  const renewal = (await android.request('device/challenge', { device_id: activated.device_id })).body;
+  const failed = await android.request('device/renew', device.renewal(renewal));
+  assert.equal(failed.status, 503);
+  assert.equal(failed.body.code, 'gateway_unavailable');
+  assert.equal(failed.body.gateway, undefined);
+  assert.deepEqual(claims[1], claims[0]);
 });
 
 test('mock payments require explicit mode and paid, canceled and replayed orders affect access correctly', async (t) => {

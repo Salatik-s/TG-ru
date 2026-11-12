@@ -1,4 +1,4 @@
-"""Prepare the loopback Store acceptance build from the verified clean Android preview."""
+"""Prepare a Store APK from the verified clean Android preview."""
 
 import argparse
 import json
@@ -11,13 +11,17 @@ from prepare_route_update import generate_r
 
 PREVIEW20 = "de059a2365b83d09e8abb72d564852110a7f60941c364eb7a0633a6d74818b94"
 ACTIVITY = "org.telegram.messenger.family.FamilyStoreGateActivity"
-MARKER = "org.telegram.messenger.family.STORE_LOCAL_QA"
+MARKER = "org.telegram.messenger.family.STORE"
+LOCAL_MARKER = MARKER + "_LOCAL_QA"
+VERSION_CODE = 10023
+VERSION_NAME = "0.1.0-preview22-store"
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base", type=Path, required=True)
     parser.add_argument("--work", type=Path, required=True)
+    parser.add_argument("--public", action="store_true", help="Use the production HTTPS origin")
     args = parser.parse_args()
     work = within_work(args.work)
     decoded = work / "decoded"
@@ -34,7 +38,7 @@ def main():
     app = root.find("application")
     if root.get("package") != FAMILY_PACKAGE or app is None or app.get(A + "networkSecurityConfig") != "@xml/fg_network_security":
         raise ValueError("Unexpected package or network security configuration")
-    if any(node.get(A + "name") in (MARKER, ACTIVITY) for node in app):
+    if any(node.get(A + "name") in (MARKER, LOCAL_MARKER, ACTIVITY) for node in app):
         raise ValueError("Store preview has already been prepared")
 
     security_path = decoded / "res/xml/fg_network_security.xml"
@@ -43,25 +47,27 @@ def main():
     if base_security is None or base_security.get("cleartextTrafficPermitted") != "false":
         raise ValueError("Cleartext must stay blocked outside loopback")
 
-    root.set(A + "versionCode", "10022")
-    root.set(A + "versionName", "0.1.0-preview21-store")
+    root.set(A + "versionCode", str(VERSION_CODE))
+    root.set(A + "versionName", VERSION_NAME)
     ET.SubElement(app, "activity", {
         A + "name": ACTIVITY, A + "exported": "false",
         A + "theme": "@style/FamilyGramTheme", A + "windowSoftInputMode": "adjustResize",
     })
     ET.SubElement(app, "meta-data", {A + "name": MARKER, A + "value": "true"})
-    local = ET.SubElement(security.getroot(), "domain-config", {"cleartextTrafficPermitted": "true"})
-    ET.SubElement(local, "domain", {"includeSubdomains": "false"}).text = "127.0.0.1"
+    if not args.public:
+        ET.SubElement(app, "meta-data", {A + "name": LOCAL_MARKER, A + "value": "true"})
+        local = ET.SubElement(security.getroot(), "domain-config", {"cleartextTrafficPermitted": "true"})
+        ET.SubElement(local, "domain", {"includeSubdomains": "false"}).text = "127.0.0.1"
 
     generate_r(ET.parse(decoded / "res/values/public.xml"), work)
     manifest.write(manifest_path, "utf-8", xml_declaration=True)
     security.write(security_path, "utf-8", xml_declaration=True)
-    metadata_path.write_text(metadata.replace("versionCode: 10021", "versionCode: 10022")
-                             .replace("versionName: 0.1.0-preview20", "versionName: 0.1.0-preview21-store"), "utf-8")
+    metadata_path.write_text(metadata.replace("versionCode: 10021", f"versionCode: {VERSION_CODE}")
+                             .replace("versionName: 0.1.0-preview20", f"versionName: {VERSION_NAME}"), "utf-8")
     (work / "report.json").write_text(json.dumps({
-        "base_sha256": PREVIEW20, "version_code": 10022, "local_store_qa": True,
+        "base_sha256": PREVIEW20, "version_code": VERSION_CODE, "local_store_qa": not args.public,
     }, indent=2), "utf-8")
-    print("Prepared Store acceptance APK with loopback-only cleartext")
+    print("Prepared Store APK for public HTTPS" if args.public else "Prepared Store APK for loopback QA")
 
 
 if __name__ == "__main__":

@@ -2,16 +2,17 @@
   'use strict';
 
   const allowedThemes = new Set(['light', 'dark', 'system']);
-  let theme = 'system';
+  let theme = 'dark';
   try {
     const saved = localStorage.getItem('tg-ru-theme');
     if (allowedThemes.has(saved)) theme = saved;
   } catch {}
+  const systemLight = window.matchMedia('(prefers-color-scheme: light)');
   const setTheme = (value) => {
-    if (value === 'system') delete document.documentElement.dataset.theme;
-    else document.documentElement.dataset.theme = value;
+    document.documentElement.dataset.theme = value === 'system' && systemLight.matches ? 'system-light' : value;
   };
   setTheme(theme);
+  systemLight.addEventListener('change', () => setTheme(theme));
 
   document.addEventListener('DOMContentLoaded', () => {
     const picker = document.querySelector('#theme');
@@ -20,8 +21,9 @@
       picker.parentElement.hidden = false;
       picker.addEventListener('change', () => {
         if (!allowedThemes.has(picker.value)) return;
-        setTheme(picker.value);
-        try { localStorage.setItem('tg-ru-theme', picker.value); } catch {}
+        theme = picker.value;
+        setTheme(theme);
+        try { localStorage.setItem('tg-ru-theme', theme); } catch {}
       });
     }
 
