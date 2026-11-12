@@ -1,24 +1,26 @@
-# TG-ru · S.A.A.
+# TG-ru
 
-Семейный Android-клиент Telegram с привычным интерфейсом, собственным шлюзом подключения и управляемым доступом устройств. Название приложения — **TG-ru**, файл установки — **TG-ru.apk**, заголовок главного экрана — **S.A.A.**
+TG-ru — неофициальный клиент Telegram со своим шлюзом. Для редакции **Store** разрабатываются личный кабинет и подписка на доступ к шлюзу за **199 ₽ на 30 дней**, до трёх устройств на аккаунт. Редакция **Friends** предназначена для владельца и приглашённых пользователей.
 
-Это приватный проект личного аккаунта **Salatik-s**. Репозиторий не предназначен для публикации. Код и документация не содержат ключ подписи APK, Telegram-сессии, коды входа, приглашения или VPN-профили.
+Сейчас работает Android preview с допуском по приглашению. Оплата, кабинет и раздельные сборки Store и Friends в разработке. Android и iOS ведутся в разных ветках. [Журнал работ по подпискам](https://github.com/Salatik-s/TG-ru/blob/sukhovskiy.a.a/billing-foundation/docs/WORKLOG.md).
 
-## Проверенная Android-сборка
+## Актуальная Android-сборка
 
-**0.1.0-preview12** · versionCode **10012** · **150 083 216 байт**. Файл `TG-ru.apk` доступен во вложениях приватного [Release v0.1.0-preview12](https://github.com/Salatik-s/TG-ru/releases/tag/v0.1.0-preview12).
+**0.1.0-preview17** · versionCode **10018** · **159 315 814 байт**. [Исходники и отчёт preview17](https://github.com/Salatik-s/TG-ru/tree/0ed7e51849abf9d8dc6feb4660c8b0e9d45bcb14).
 
 ```text
-SHA-256: c16d553478540f1ccb810f36dbf833d1c18e9b31550758018c2e72d46e72763c
+SHA-256: fe8f6e173b672a178ff44f582d6017d91a77256526afddb92f1acaac67a1daa5
 ```
 
-В preview12 обновлены компактные настройки призрака с читаемыми переключателями и тихое служебное уведомление **TG-ru**, отражающее настоящее соединение выбранного аккаунта с Telegram. Все семь прежних контролов, пользовательские значения, пакет и ключ подписи сохранены.
+- При потере сети уже загруженные чаты остаются открытыми. После восстановления связи приложение перепроверяет допуск.
+- При длительном сбое WSS клиент пробует разрешённый профиль REALITY. Настройки позволяют включить диагностику сети на 24 часа.
+- Настройки призрака и плагинов оформлены в одном стиле. Способ расшифровки выбирается в плагинах, языковые модели загружаются через Android.
 
-[Финальный отчёт preview12](qa/saved-media/PREVIEW12-RESULT.md) · [Служебное уведомление](docs/NOTIFICATIONS.md) · [Настройки призрака](docs/PRIVACY-SETTINGS.md) · [Проверки целостности](docs/preview12-integrity.json).
+На Android 15 проверены работа без сети, сохранение открытого чата и черновика, а также повторная установка русской языковой модели. Реальный звонок через шлюз ещё не подтверждён. [Проверка безопасности](https://github.com/Salatik-s/TG-ru/blob/0ed7e51849abf9d8dc6feb4660c8b0e9d45bcb14/design/security-audit-2026-11-12.md) · [Диагностика звонков](https://github.com/Salatik-s/TG-ru/blob/0ed7e51849abf9d8dc6feb4660c8b0e9d45bcb14/calls/AUDIT-2026-11-12.md).
 
-Предыдущие [preview11](qa/saved-media/PREVIEW11-RESULT.md) и [preview9](qa/saved-media/PREVIEW9-RESULT.md) сохранены отдельно вместе со своими Release и контрольными суммами. Preview10 был отладочным и не публиковался. Исходное описание проекта — [docs/PROJECT.md](docs/PROJECT.md); контрольные суммы исходников — [docs/SOURCE-SNAPSHOT.json](docs/SOURCE-SNAPSHOT.json).
+### Архив
 
-Android Release не содержит IPA. Дальнейшая работа iOS отложена пользователем; в этом обновлении iOS и CI не изменялись.
+Материалы и скриншоты ниже относятся к preview12 и ранним версиям. `main` содержит исходники preview12, исходники preview17 находятся в ветке Android. [Приватный Release preview12](https://github.com/Salatik-s/TG-ru/releases/tag/v0.1.0-preview12) · [Отчёт preview12](qa/saved-media/PREVIEW12-RESULT.md) · [preview11](qa/saved-media/PREVIEW11-RESULT.md) · [preview9](qa/saved-media/PREVIEW9-RESULT.md).
 
 ## Что умеет
 
