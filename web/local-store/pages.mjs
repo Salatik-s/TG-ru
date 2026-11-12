@@ -111,13 +111,13 @@ function layout(title, content, { session, route, marketing = false } = {}) {
 </html>`;
 }
 
-function home(session) {
+function home(session, release) {
   return layout(strings.home.title, `
 <section class="wrap hero">
   <div class="hero-copy">
     <h1>Неофициальный клиент Telegram <span>со своим шлюзом</span></h1>
     <p class="lead">${strings.home.subtitle}.</p>
-    <div class="actions">${session.account ? action('/cabinet', 'Открыть кабинет', 'primary') : action('/register', 'Создать аккаунт', 'primary') + action('/login', 'Войти')}</div>
+    <div class="actions">${session.account ? action('/cabinet', 'Открыть кабинет', 'primary') : action('/register', 'Создать аккаунт', 'primary') + action('/login', 'Войти')}${release ? action('/downloads', 'Скачать APK') : ''}</div>
     <p class="trial-note">${icon('time')}Первые 5 часов бесплатно. Банковская карта для пробы не нужна.</p>
   </div>
   <figure class="route-figure" aria-label="Маршрут подключения">
@@ -314,7 +314,7 @@ function checkout(session) {
 }
 
 const documents = {
-  '/downloads': ['Загрузки', `<h2>TG-ru для Android</h2><p>Публичная загрузка пока не открыта.</p><h2>Подключение устройства</h2><ol><li>Создайте аккаунт TG-ru и начните пробу или оформите подписку.</li><li>Откройте установленное приложение и введите логин и пароль TG-ru.</li><li>Войдите в свой аккаунт Telegram на следующем экране.</li></ol><p>Android попросит разрешить установку из этого источника. Это нормально для установки не из магазина.</p>`],
+  '/downloads': ['Загрузки', '<h2>Подключение устройства</h2><ol><li>Создайте аккаунт TG-ru и запустите пятичасовую пробу или получите доступ через поддержку.</li><li>Откройте приложение и введите логин и пароль TG-ru.</li><li>Войдите в свой аккаунт Telegram на следующем экране.</li></ol><p>При установке Android может попросить разрешить установку приложений из браузера.</p>'],
   '/help': ['Помощь', `<h2>Доступ к шлюзу</h2><p>Оплата временно недоступна. Для получения доступа обратитесь в поддержку.</p><p><a href="${supportLink}">Написать в поддержку</a></p><h2>Не получается подключить телефон</h2><p>Проверьте, что пробный период или подписка действуют. При лимите в три телефона сначала отвяжите одно из устройств в кабинете.</p><p><a href="/cabinet">Открыть кабинет</a></p>`],
   '/visibility': ['Что мы видим, а чего нет', `${visibilitySummary()}<h2>Два аккаунта</h2><p>Аккаунт TG-ru связывает подписку и устройство. В Telegram вы входите отдельно. Пароль TG-ru вводится при активации устройства, затем оно подтверждает себя своим ключом.</p><h2>Как проверить сборку</h2><p>Сборка приложения пока не воспроизводима: вы можете сверить хеш файла с опубликованным, но не можете самостоятельно собрать тот же файл из исходного кода.</p>`],
   '/terms': ['Оферта', '<p>Оферта готовится до запуска оплаты.</p><h2>Стоимость</h2><p>199 ₽ за 30 дней. Проба на 5 часов доступна один раз для аккаунта. Автоматических списаний нет.</p>'],
@@ -323,9 +323,18 @@ const documents = {
   '/compatibility': ['Политика совместимости', '<p>Порядок поддержки версий и архив загрузок будут опубликованы перед выпуском.</p>'],
 };
 
-function documentPage(route, session) {
+function documentPage(route, session, release) {
   const [title, body] = documents[route];
-  return layout(title, `<article class="wrap prose"><h1>${title}</h1>${body}</article>`, { session, route });
+  const downloads = route === '/downloads' ? `<h2>TG-ru для Android</h2>${
+    release
+      ? `<p>Версия ${escapeHtml(release.version_name)} · Android ${release.min_sdk === 24 ? '7.0+' : 'API ' + release.min_sdk} · ${Math.round(release.bytes / 1024 / 1024)} МиБ</p>
+<p>Опубликовано ${formatDate(Date.parse(release.released_at) / 1000)} по Москве.</p>
+<div class="actions"><form method="post" action="/form/download">${csrf(session)}${formButton('Скачать TG-ru.apk')}</form></div>
+<details><summary>Контрольная сумма SHA-256</summary><p class="break-word"><code>${escapeHtml(release.sha256)}</code></p></details>
+<p>Установка поверх версии с приглашением переключит приложение на вход через кабинет TG-ru. Уже установленная версия с приглашением продолжит работать через свой шлюз.</p>`
+      : '<p>Публичная загрузка пока не открыта.</p>'
+  }` : '';
+  return layout(title, `<article class="wrap prose"><h1>${title}</h1>${downloads}${body}</article>`, { session, route });
 }
 
 function redirect(response, location) {
@@ -363,7 +372,7 @@ async function formData(request) {
   return Object.fromEntries(new URLSearchParams(Buffer.concat(buffers).toString('utf8')));
 }
 
-export async function handleStorePages(request, response, { getSession, submit }) {
+export async function handleStorePages(request, response, { getSession, submit, release }) {
   const url = new URL(request.url, 'http://localhost');
   const route = url.pathname;
   const asset = staticFiles.get(route);
@@ -410,8 +419,8 @@ export async function handleStorePages(request, response, { getSession, submit }
     return true;
   }
 
-  if (protectedPages.has(route) && !session.account) redirect(response, '/login');
-  else if (route === '/') html(home(session));
+  if ((protectedPages.has(route) || release && route === '/downloads') && !session.account) redirect(response, '/login');
+  else if (route === '/') html(home(session, release));
   else if (route === '/register' || route === '/login') {
     if (session.account) redirect(response, '/cabinet');
     else html(credentialsPage(route, session));
@@ -419,6 +428,6 @@ export async function handleStorePages(request, response, { getSession, submit }
   else if (route === '/cabinet') html(cabinet(session, '', now));
   else if (route === '/devices') html(devices(session));
   else if (route === '/checkout') html(checkout(session));
-  else html(documentPage(route, session));
+  else html(documentPage(route, session, release));
   return true;
 }

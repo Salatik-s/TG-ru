@@ -54,6 +54,7 @@ public final class FamilyAppUpdate {
     private FamilyAppUpdate() { }
 
     public static boolean hasUpdate(Context context) {
+        if (FamilyStoreAccess.isConfigured(context)) return false;
         Release release = available;
         return release != null && release.version > installedVersion(context) && release.minSdk <= Build.VERSION.SDK_INT;
     }
@@ -96,6 +97,7 @@ public final class FamilyAppUpdate {
     public static void open(Activity activity) { fetch(activity, null, true); }
 
     private static void fetch(Activity activity, Runnable changed, boolean interactive) {
+        if (FamilyStoreAccess.isConfigured(activity)) return;
         if (!CHECKING.compareAndSet(false, true)) {
             if (interactive) toast(activity, "Проверяем обновления…");
             return;

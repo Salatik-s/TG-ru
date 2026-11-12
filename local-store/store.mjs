@@ -573,6 +573,10 @@ export function createStore({
     close: () => db.close(),
     purge,
     findSession,
+    authorizeDownload(session, csrf) {
+      requireCsrf(session, csrf);
+      requireAccount(session);
+    },
     newSession,
     sessionData,
     webAction,

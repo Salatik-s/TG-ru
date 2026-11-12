@@ -255,6 +255,7 @@ summary { cursor: pointer; }
 
 .prose { max-inline-size: 70ch; padding-block: 48px; }
 .prose p, .prose h2, .prose ol { margin-block-start: 16px; }
+.prose .break-word { overflow-wrap: anywhere; }
 .prose .visibility-grid { grid-template-columns: 1fr; }
 .prose .visibility-grid p { margin-block-start: 8px; }
 .site-footer { border-top: 1px solid var(--border); }

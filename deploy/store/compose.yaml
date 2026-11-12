@@ -1,0 +1,56 @@
+name: tg-ru-store
+
+x-runtime: &runtime
+  image: node:24-bookworm-slim@sha256:c0a93797ee78814ae6d32fcca2561fdbbe423149c3f5389aad32d86e9fd85bd4
+  pull_policy: never
+  working_dir: /app
+  network_mode: host
+  read_only: true
+  init: true
+  restart: unless-stopped
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  pids_limit: 128
+  env_file: /opt/tg-ru-store/data/runtime.env
+  tmpfs:
+    - /tmp:size=16m,mode=1777
+  logging:
+    driver: json-file
+    options: {max-size: "5m", max-file: "2"}
+
+services:
+  gateway:
+    <<: *runtime
+    user: "10001:10001"
+    command: [node, server/store-gateway-main.mjs]
+    environment:
+      STORE_GATEWAY_HOST: tg.24projects.ru
+      STORE_GATEWAY_DIR: /data
+      STORE_GATEWAY_EGRESS_FILE: /legacy-egress.json
+      XRAY_BINARY: /usr/local/bin/xray
+    volumes:
+      - ../../server:/app/server:ro
+      - ../../local-store:/app/local-store:ro
+      - ./:/app/deploy/store:ro
+      - /opt/tg-ru-store/data/gateway:/data
+      - /opt/familygram/data/egress.json:/legacy-egress.json:ro
+      - ${STORE_XRAY_PATH:?Verified FamilyGram Xray required}:/usr/local/bin/xray:ro
+
+  web:
+    <<: *runtime
+    user: "10002:10002"
+    command: [node, local-store/main.mjs]
+    environment:
+      TG_RU_STORE_PUBLIC_ORIGIN: https://tg.24projects.ru
+      TG_RU_STORE_RELEASE_FILE: /app/store-release.json
+    volumes:
+      - ../../local-store:/app/local-store:ro
+      - ../../web/local-store:/app/web/local-store:ro
+      - ../../i18n:/app/i18n:ro
+      - ../../store-release.json:/app/store-release.json:ro
+      - /opt/tg-ru-store/data/web:/app/.private/local-store
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:48185/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
