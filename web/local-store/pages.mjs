@@ -20,7 +20,6 @@ const supportLink = 'https://t.me/prince_skazki';
 
 const paths = {
   phone: '<rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 17h2"/>',
-  relay: '<rect x="4" y="4" width="16" height="6" rx="1"/><rect x="4" y="14" width="16" height="6" rx="1"/><path d="M8 7h.01M8 17h.01m4-10h4m-4 10h4"/>',
   chat: '<path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l1.3-3.6A7.5 7.5 0 1 1 20 11.5Z"/><path d="M9 11.5h6"/>',
   eye: '<path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.5"/>',
   lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4m-4 4v2"/>',
@@ -112,30 +111,31 @@ function layout(title, content, { session, route, marketing = false } = {}) {
 }
 
 function home(session, release) {
+  const accountPath = session.account ? '/cabinet' : '/register';
+  const primary = action(accountPath, session.account ? 'Открыть кабинет' : 'Создать аккаунт', 'primary');
+  const secondary = release ? action('/downloads', 'Скачать APK') : action('/login', 'Войти');
   return layout(strings.home.title, `
 <section class="wrap hero">
   <div class="hero-copy">
-    <h1>Неофициальный клиент Telegram <span>со своим шлюзом</span></h1>
+    <h1>Telegram через<br><span>VPN-шлюз TG-ru</span></h1>
     <p class="lead">${strings.home.subtitle}.</p>
-    <div class="actions">${session.account ? action('/cabinet', 'Открыть кабинет', 'primary') : action('/register', 'Создать аккаунт', 'primary') + action('/login', 'Войти')}${release ? action('/downloads', 'Скачать APK') : ''}</div>
-    <p class="trial-note">${icon('time')}Первые 5 часов бесплатно. Банковская карта для пробы не нужна.</p>
+    <div class="actions">${primary}${secondary}</div>
   </div>
   <figure class="route-figure" aria-label="Маршрут подключения">
     <figcaption>Маршрут подключения</figcaption>
     <ol class="route">
       <li><span class="route-icon">${icon('phone')}</span><span><strong>Ваш Android</strong><small>Приложение TG-ru</small></span></li>
-      <li class="route-current"><span class="route-icon">${icon('relay')}</span><span><strong>Шлюз TG-ru</strong><small>Подключение по подписке</small></span></li>
+      <li class="route-current"><span class="route-icon">${icon('arrow')}</span><span><strong>VPN-шлюз TG-ru</strong><small>Маршрут зашифрованного трафика</small></span></li>
       <li><span class="route-icon">${icon('chat')}</span><span><strong>Telegram</strong><small>Чаты вашего аккаунта</small></span></li>
     </ol>
-    <p>Логин TG-ru нужен для доступа к шлюзу. В Telegram вы входите отдельно в приложении.</p>
   </figure>
 </section>
 <section id="how" class="wrap band">
   <h2>Как это работает</h2>
   <ol class="steps">
-    <li><span>1</span><div><h3>Создайте аккаунт TG-ru</h3><p>Начните бесплатную пробу на 5 часов. За дальнейшим доступом можно обратиться в поддержку.</p></div></li>
-    <li><span>2</span><div><h3>Скачайте приложение и введите логин и пароль один раз</h3><p>Так приложение привяжет телефон к вашему аккаунту TG-ru.</p></div></li>
-    <li><span>3</span><div><h3>Дальше приложение подтверждает себя само, пароль на телефоне не хранится</h3><p>На следующем экране войдите в Telegram привычным способом.</p></div></li>
+    <li><span>1</span><div><h3>Создайте аккаунт и запустите пробу</h3><p>Логин и пароль кабинета нужны для доступа к шлюзу TG-ru.</p></div></li>
+    <li><span>2</span><div><h3>Скачайте APK и привяжите телефон</h3><p>Введите логин и пароль кабинета один раз при активации приложения.</p></div></li>
+    <li><span>3</span><div><h3>Войдите в Telegram</h3><p>Вход по номеру телефона откроется после активации. Дальше приложение подтверждает устройство само.</p></div></li>
   </ol>
 </section>
 <section class="wrap band">
@@ -144,28 +144,33 @@ function home(session, release) {
   <a class="text-link" href="/visibility">Подробнее о данных ${icon('arrow')}</a>
 </section>
 <section id="price" class="wrap band">
-  <h2>Цена</h2>
+  <h2>Подписка</h2>
   <div class="price-grid">
     <article class="price-panel">
-      <h3>Пробный доступ</h3>
+      <h3>Проба</h3>
       <p class="price"><strong>0 ₽</strong> на 5 часов</p>
-      <p>Один пробный период на аккаунт. Карта не нужна.</p>
-      ${action(session.account ? '/cabinet' : '/register', 'Попробовать бесплатно')}
+      <ul class="plan-points"><li>${icon('check')}VPN-шлюз TG-ru</li><li>${icon('check')}Один пробный период на аккаунт</li><li>${icon('check')}Банковская карта не нужна</li></ul>
+      ${action(accountPath, 'Попробовать бесплатно')}
     </article>
-    <article class="price-panel price-featured">
-      <h3>Доступ к шлюзу</h3>
+    <article class="price-panel">
+      <h3>Подписка</h3>
       <p class="price"><strong>199 ₽</strong> за 30 дней</p>
-      <p>До трёх устройств. Без автоматических списаний.</p>
-      ${action(session.account ? '/checkout' : '/register', 'Получить доступ', 'primary')}
+      <ul class="plan-points"><li>${icon('check')}VPN-шлюз TG-ru</li><li>${icon('check')}До трёх устройств</li><li>${icon('check')}Без автоматических списаний</li></ul>
+      ${action(supportLink, 'Получить доступ', 'primary')}
+    </article>
+    <article class="price-panel price-support">
+      <h3>Поддержка</h3>
+      <p class="price"><strong>Подключение</strong></p>
+      <p>Онлайн-оплата временно недоступна. Напишите нам, если нужно выдать доступ или помочь с настройкой телефона.</p>
+      ${action(supportLink, 'Написать в Telegram')}
     </article>
   </div>
-  <p class="pricing-note">Онлайн-оплата пока недоступна. <a href="${supportLink}">Написать в поддержку</a>.</p>
 </section>
 <section class="wrap band">
   <h2>Частые вопросы</h2>
   <div class="faq">
-    <details><summary>Это официальный Telegram?</summary><p>Нет. TG-ru — неофициальный клиент. Telegram не связан с этим сервисом.</p></details>
-    <details><summary>Читаете ли вы мои переписки?</summary><p>Шлюз пересылает трафик, зашифрованный протоколом Telegram. <a href="/visibility">Подробнее о данных шлюза</a>.</p></details>
+    <details><summary>Как защищены сообщения?</summary><p>Приложение использует протокол MTProto для связи с Telegram. Наш VPN-шлюз пересылает зашифрованный трафик. <a href="/visibility">Подробнее о данных шлюза</a>.</p></details>
+    <details><summary>Зачем два аккаунта?</summary><p>Кабинет TG-ru управляет доступом к VPN-шлюзу. В свой аккаунт Telegram вы входите отдельно, в приложении.</p></details>
     <details><summary>Что будет, когда подписка закончится?</summary><p>Приложение покажет экран продления. Ваши данные Telegram на телефоне не удаляются.</p></details>
     <details><summary>Сколько устройств можно подключить?</summary><p>До трёх.</p></details>
   </div>
@@ -174,8 +179,8 @@ function home(session, release) {
 
 function visibilitySummary() {
   return `<div class="visibility-grid">
-    <div><h3>${icon('eye')} Что видно шлюзу</h3><p>IP-адрес подключения, время соединения и объём переданного трафика.</p></div>
-    <div><h3>${icon('lock')} Что шлюз не видит</h3><p>Содержимое переписки и файлов, номер телефона, код входа и облачный пароль Telegram.</p></div>
+    <div><h3><span class="route-icon">${icon('eye')}</span>Что видно шлюзу</h3><p>IP-адрес подключения, время соединения и объём переданного трафика.</p></div>
+    <div><h3><span class="route-icon">${icon('lock')}</span>Что шлюз не видит</h3><p>Содержимое переписки и файлов, номер телефона, код входа и облачный пароль Telegram.</p></div>
   </div>`;
 }
 

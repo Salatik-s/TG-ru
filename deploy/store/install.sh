@@ -41,6 +41,10 @@ printf '%s  %s\n' "$checksum" "$source_root/TG-ru.apk" | sha256sum -c --status -
     die 'Store APK SHA-256 check failed.'
 [[ -f $source_root/store-release.json && ! -L $source_root/store-release.json ]] ||
     die 'Store APK release metadata missing.'
+for migration in schema.sql manual-grants.sql; do
+    [[ -s $source_root/local-store/$migration && ! -L $source_root/local-store/$migration ]] ||
+        die "Store database migration missing: $migration"
+done
 python3 - "$source_root" "$checksum" <<'PY'
 from pathlib import Path
 import json
@@ -162,7 +166,10 @@ install -m 0644 "$source_root/store-release.json" "$release/store-release.json"
 compose "$release" config --quiet
 
 services_changed=1
-compose "$release" up -d --pull never --wait --wait-timeout 45
+if ! compose "$release" up -d --pull never --wait --wait-timeout 45; then
+    compose "$release" logs --no-color --tail 25 web gateway >&2 || true
+    die 'Store container startup checks failed.'
+fi
 gateway_id=$(compose "$release" ps -q gateway)
 [[ $gateway_id =~ ^[0-9a-f]{12,64}$ ]] || die 'Store gateway container did not start.'
 ready=0

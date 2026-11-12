@@ -20,6 +20,7 @@ $paths = @(
     'deploy/store/install.sh','deploy/store/compose.yaml','deploy/store/route.py','deploy/store/verify.mjs',
     'server/store-gateway-main.mjs','server/store-gateway.mjs','server/gateway.mjs','server/egress.mjs','server/egress-probe.mjs',
     'local-store/main.mjs','local-store/database-path.mjs','local-store/http.mjs','local-store/store.mjs',
+    'local-store/schema.sql','local-store/manual-grants.sql',
     'local-store/gateway-client.mjs','local-store/owner.mjs',
     'web/local-store/pages.mjs','web/local-store/store.css','web/local-store/store.mjs',
     'web/local-store/Inter-OFL.txt','web/local-store/inter-cyrillic.woff2','web/local-store/inter-latin.woff2','i18n/ru.json'

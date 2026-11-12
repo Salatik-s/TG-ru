@@ -1,12 +1,12 @@
 {
   "site": {
     "title": "TG-ru",
-    "disclaimer": "TG-ru — неофициальный клиент Telegram. Не связан с Telegram FZ-LLC."
+    "disclaimer": "TG-ru — независимый клиент Telegram с собственным VPN-шлюзом."
   },
   "home": {
-    "title": "Неофициальный клиент Telegram со своим шлюзом",
+    "title": "Telegram через VPN-шлюз TG-ru",
     "preview": "Публичная редакция Store в разработке.",
-    "subtitle": "Работает через сервер TG-ru. Подписка 199 ₽ в месяц. Отмена в любой момент"
+    "subtitle": "Подключайтесь к Telegram через наш VPN-шлюз. Сообщения шифруются протоколом Telegram. Первые 5 часов бесплатно"
   },
   "cabinet": {
     "status": {

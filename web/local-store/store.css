@@ -149,15 +149,13 @@ nav a[aria-current="page"] { color: var(--accent); text-decoration: underline; f
 .hero-copy { display: grid; align-content: center; gap: 24px; }
 .hero-copy h1 { max-inline-size: 18ch; font-size: clamp(2.05rem, 1.2rem + 3.4vw, 3.5rem); line-height: 1.08; }
 .hero-copy h1 span { color: var(--accent); }
-.lead { max-inline-size: 46ch; font-size: 1.0625rem; }
-.trial-note { display: flex; align-items: flex-start; gap: 8px; color: var(--text); font-size: .875rem; }
-.trial-note svg { inline-size: 20px; block-size: 20px; color: var(--accent); }
-.route-figure { display: grid; align-content: start; gap: 16px; padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.lead { max-inline-size: 520px; font-size: 1.0625rem; line-height: 1.55; }
+.route-figure { display: grid; align-content: start; gap: 12px; padding: 16px; background: var(--surface); }
 .route-figure figcaption { color: var(--muted); font-size: .8125rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
-.route-figure > p { padding-block-start: 12px; border-top: 1px solid var(--border); font-size: .875rem; }
 .route { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
-.route li { display: flex; align-items: center; gap: 16px; padding: 12px 16px; border: 1px solid var(--border); border-radius: 12px; }
+.route li { display: flex; align-items: center; gap: 16px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; }
 .route li > span:last-child { min-inline-size: 0; }
+.route strong { font-size: .9375rem; }
 .route small { display: block; overflow-wrap: anywhere; }
 .route li.route-current { background: var(--tint); border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); }
 .route-icon { display: grid; place-items: center; flex: none; inline-size: 36px; block-size: 36px; border-radius: 10px; background: var(--tint); color: var(--accent); }
@@ -168,23 +166,26 @@ nav a[aria-current="page"] { color: var(--accent); text-decoration: underline; f
 .steps { display: grid; gap: 16px; margin: 0; padding: 0; list-style: none; }
 .steps li { display: grid; align-content: start; gap: 14px; padding: 24px; }
 .steps li > span { display: grid; place-items: center; inline-size: 36px; block-size: 36px; border-radius: 50%; background: var(--tint); color: var(--accent); font-weight: 700; }
-.steps p { margin-block-start: 4px; }
+.steps p { margin-block-start: 6px; font-size: .9375rem; line-height: 1.55; }
 .visibility-grid { display: grid; gap: 16px; margin-block: 16px; }
-.visibility-grid > div { padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
-.visibility-grid h3 { display: flex; gap: 8px; align-items: center; }
+.visibility-grid > div { padding: 24px; background: var(--surface); }
+.visibility-grid h3 { display: flex; gap: 16px; align-items: center; }
 .visibility-grid h3 svg { color: var(--accent); }
 .visibility-grid p { margin-block-start: 8px; }
 .text-link { display: inline-flex; gap: 8px; align-items: center; min-block-size: 44px; }
 .text-link svg { inline-size: 20px; block-size: 20px; }
 .price-grid { display: grid; gap: 16px; }
-.price-panel { display: grid; gap: 12px; padding: 24px; align-content: start; }
-.price-panel h3 { color: var(--accent); }
-.price-featured, .subscription-card { background: linear-gradient(180deg, var(--tint), var(--surface) 80%); }
-.price-panel.price-featured, .dashboard-card.subscription-card { border-color: color-mix(in srgb, var(--accent) 66%, var(--border)); }
-.pricing-note { margin-block-start: 16px; }
+.price-panel { display: flex; flex-direction: column; gap: 24px; padding: clamp(22px, 2.6vw, 32px); background: var(--surface); }
+.price-panel h3 { color: var(--accent); font-size: .875rem; text-transform: uppercase; letter-spacing: .06em; }
+.price-panel > .button { margin-block-start: auto; min-block-size: 52px; }
+.price-panel.price-support, .subscription-card { background: linear-gradient(180deg, var(--tint), var(--surface) 80%); }
+.price-panel.price-support, .dashboard-card.subscription-card { border-color: color-mix(in srgb, var(--accent) 66%, var(--border)); }
+.price-support .price strong { font-size: clamp(1.45rem, 2.2vw, 2.15rem); }
+.plan-points { display: grid; gap: 12px; list-style: none; margin: 0; padding: 0; font-size: .9375rem; }
+.plan-points li { display: flex; align-items: flex-start; gap: 10px; }
+.plan-points svg { inline-size: 16px; block-size: 16px; margin-block-start: 3px; color: var(--accent); }
 .price { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; color: var(--text); }
 .price strong { font-size: clamp(2.15rem, 1.2rem + 2.6vw, 3rem); letter-spacing: -.026em; line-height: 1.24; font-variant-numeric: tabular-nums; }
-.price-panel .button { margin-block-start: 8px; }
 .faq { border-top: 1px solid var(--border); }
 .faq details { border-bottom: 1px solid var(--border); }
 summary { cursor: pointer; }
@@ -270,7 +271,7 @@ summary { cursor: pointer; }
   border: 1px solid var(--border);
   border-radius: 16px;
 }
-.steps li, .price-panel:not(.price-featured), .form-card, .dashboard-card:not(.subscription-card) { background: var(--surface); }
+.steps li, .form-card, .dashboard-card:not(.subscription-card) { background: var(--surface); }
 
 @media (max-width: 420px) {
   .topbar nav { gap: 0 12px; }
@@ -295,10 +296,11 @@ summary { cursor: pointer; }
 @media (min-width: 800px) {
   .topbar { grid-template-columns: minmax(0, 1fr) auto auto; min-block-size: 72px; }
   .topbar nav { grid-row: auto; grid-column: auto; gap: 0 28px; }
-  .hero { gap: clamp(32px, 5vw, 64px); align-items: center; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); padding-block: 80px; }
-  .hero .actions { gap: 12px; }
+  .hero { gap: clamp(32px, 5vw, 64px); align-items: center; grid-template-columns: minmax(0, 1.085fr) minmax(0, 1fr); padding-block: 80px; min-block-size: 512px; }
+  .hero .actions { gap: 16px; }
   .hero .button { min-block-size: 56px; padding-inline: 32px; }
   .steps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .price-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .dashboard-grid { grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); }
 }
 
