@@ -202,6 +202,8 @@ public final class FamilyAccess {
 
     private static synchronized void begin(String action, String code, boolean openTunnel) {
         if (preferences == null || snapshot.busy) return;
+        if (openTunnel && FamilyStoreAccess.isConfigured(applicationContext)
+                && !FamilyStoreAccess.isActive(applicationContext)) return;
         if (action.equals("invite") && snapshot.retrySeconds() > 0) return;
         long epoch = EPOCH.get();
         String endpoint = server;

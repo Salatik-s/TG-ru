@@ -5,6 +5,8 @@ import android.app.Application;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import java.lang.ref.WeakReference;
 import java.util.Collections;
 import java.util.Set;
@@ -15,22 +17,46 @@ public final class FamilyBinaryGuard implements Application.ActivityLifecycleCal
     private static final String LAUNCHER = "org.telegram.ui.LaunchActivity";
     private static FamilyBinaryGuard instance;
     private static final Set<Activity> redirecting = Collections.newSetFromMap(new WeakHashMap<>());
+    private final Context application;
     private WeakReference<Activity> foreground = new WeakReference<>(null);
+
+    private FamilyBinaryGuard(Context application) {
+        this.application = application;
+    }
 
     public static synchronized void install(Context context) {
         if (instance != null) return;
-        instance = new FamilyBinaryGuard();
-        ((Application)context.getApplicationContext()).registerActivityLifecycleCallbacks(instance);
+        Application application = (Application)context.getApplicationContext();
+        instance = new FamilyBinaryGuard(application);
+        application.registerActivityLifecycleCallbacks(instance);
         FamilyAccess.addListener(instance);
+        if (FamilyStoreAccess.isConfigured(application)) {
+            FamilyStoreAccess.ensureRefreshing(application);
+            instance.watchStoreAccess();
+        }
     }
     private static boolean familyScreen(Activity activity) {
-        return activity instanceof FamilyGateActivity || activity instanceof FamilySettingsActivity;
+        return activity instanceof FamilyGateActivity || activity instanceof FamilySettingsActivity
+                || activity instanceof FamilyStoreGateActivity;
     }
     public static boolean canShowChats() {
+        FamilyBinaryGuard guard = instance;
+        if (guard != null && FamilyStoreAccess.isConfigured(guard.application)) {
+            return FamilyStoreAccess.isActive(guard.application) || hasStoreChatCache(guard.application);
+        }
         return FamilyAccess.isAllowed() || FamilyAccess.hasCachedAccount();
     }
 
+    private static boolean hasStoreChatCache(Context context) {
+        return FamilyAccess.hasCachedAccount()
+                && FamilyStoreAccess.accessUntil(context) > System.currentTimeMillis() / 1000;
+    }
+
     private static boolean canShow(Activity activity) {
+        if (FamilyStoreAccess.isConfigured(activity)) {
+            return activity instanceof FamilyStoreGateActivity || FamilyStoreAccess.isActive(activity)
+                    || activity.getClass().getName().equals(LAUNCHER) && hasStoreChatCache(activity);
+        }
         if (FamilyAccess.isAllowed()) return true;
         String type = activity.getClass().getName();
         return FamilyAccess.hasCachedAccount()
@@ -47,12 +73,37 @@ public final class FamilyBinaryGuard implements Application.ActivityLifecycleCal
     }
 
     public static void redirect(Activity activity) {
-        if (familyScreen(activity) || activity.isFinishing() || redirecting.contains(activity)) return;
+        boolean store = FamilyStoreAccess.isConfigured(activity);
+        if (activity instanceof FamilyStoreGateActivity || !store && familyScreen(activity)
+                || activity.isFinishing() || redirecting.contains(activity)) return;
         redirecting.add(activity);
-        Intent intent = new Intent(activity, FamilyGateActivity.class);
+        Class<? extends Activity> destination = store ? FamilyStoreGateActivity.class : FamilyGateActivity.class;
+        Intent intent = new Intent(activity, destination);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         activity.startActivity(intent);
         activity.finish();
+    }
+
+    private void watchStoreAccess() {
+        Handler main = new Handler(Looper.getMainLooper());
+        Runnable check = new Runnable() {
+            private boolean wasActive = FamilyStoreAccess.isActive(application);
+
+            @Override public void run() {
+                boolean active = FamilyStoreAccess.isActive(application);
+                Activity activity = foreground.get();
+                if (!active) {
+                    if (FamilyAccess.isAllowed()) FamilyAccess.disconnect();
+                    if (activity != null && !canShow(activity)) redirect(activity);
+                } else if (!wasActive && activity != null && activity.getClass().getName().equals(LAUNCHER)) {
+                    FamilyAccess.resumeConnection();
+                }
+                if (active != wasActive) refreshConnectionHeader();
+                wasActive = active;
+                main.postDelayed(this, 3_000);
+            }
+        };
+        main.post(check);
     }
     @Override public void onFamilyAccessChanged(FamilyAccess.Snapshot snapshot) {
         Activity activity = foreground.get();
