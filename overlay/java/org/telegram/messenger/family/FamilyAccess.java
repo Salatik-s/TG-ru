@@ -39,6 +39,7 @@ import javax.net.ssl.HttpsURLConnection;
 public final class FamilyAccess {
     public static final String DEFAULT_SERVER = "https://24projects.ru:8443";
     private static final String KEY_ALIAS = "familygram.installation.p256.v1";
+    private static final String ROUTE_FAILOVER = "allow_automatic_reality";
     private static final long LEASE_MS = 75_000L;
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private static final ScheduledExecutorService IO = Executors.newSingleThreadScheduledExecutor();
@@ -57,8 +58,7 @@ public final class FamilyAccess {
     private static Context applicationContext;
     private static ScheduledFuture<?> poll;
     private static int consecutiveFailures;
-    private static long routeFailureSince;
-    private static long retryPrimaryAt;
+    private static final FamilyRouteFailover routeFailover = new FamilyRouteFailover();
 
     private FamilyAccess() { }
 
@@ -171,12 +171,25 @@ public final class FamilyAccess {
     }
 
     static synchronized void reportTransportState(int state) {
-        if (!isAllowed() || state != 1 && state != 4 || !FamilyConnectionMonitor.hasNetwork()) {
-            routeFailureSince = 0;
-        } else if (routeFailureSince == 0) {
-            routeFailureSince = SystemClock.elapsedRealtime();
-            schedulePoll(30);
-        }
+        boolean connecting = routeFailoverEnabled() && (state == 1 || state == 4)
+                && isAllowed() && FamilyConnectionMonitor.hasNetwork();
+        if (routeFailover.observe(connecting, SystemClock.elapsedRealtime()))
+            schedulePollMillis(FamilyRouteFailover.CONNECT_TIMEOUT_MS);
+    }
+
+    static boolean hasRouteFailoverChoice() {
+        return preferences != null && preferences.contains(ROUTE_FAILOVER);
+    }
+
+    static boolean routeFailoverEnabled() {
+        return preferences != null && preferences.getBoolean(ROUTE_FAILOVER, false);
+    }
+
+    static synchronized void setRouteFailoverEnabled(boolean enabled) {
+        if (preferences == null) return;
+        preferences.edit().putBoolean(ROUTE_FAILOVER, enabled).apply();
+        reportTransportState(FamilyConnectionMonitor.transportState());
+        if (!enabled && routeFailover.usingFallback() && isAllowed()) schedulePollMillis(0);
     }
     public static void submitInvite(String invitation) {
         String code = invitation == null ? "" : invitation.trim().toUpperCase(Locale.ROOT);
@@ -232,7 +245,10 @@ public final class FamilyAccess {
                     activeGatewayHash = gatewayHash;
                     allowedUntil = SystemClock.elapsedRealtime() + LEASE_MS;
                     consecutiveFailures = 0;
+                    reportTransportState(FamilyConnectionMonitor.transportState());
                     schedulePoll(55);
+                    long routeCheck = routeFailover.millisUntilCheck(SystemClock.elapsedRealtime());
+                    if (routeCheck > 0) schedulePollMillis(routeCheck);
                 }
                 FamilyPush.configure(applicationContext, response.getJSONObject("notifications"));
             }
@@ -258,8 +274,11 @@ public final class FamilyAccess {
     }
 
     private static synchronized void schedulePoll(long seconds) {
-        if (poll != null && poll.getDelay(TimeUnit.SECONDS) > 0
-                && poll.getDelay(TimeUnit.SECONDS) <= seconds) return;
+        schedulePollMillis(TimeUnit.SECONDS.toMillis(seconds));
+    }
+
+    private static synchronized void schedulePollMillis(long delay) {
+        if (poll != null && !poll.isDone() && poll.getDelay(TimeUnit.MILLISECONDS) <= delay) return;
         if (poll != null) poll.cancel(false);
         poll = IO.schedule(() -> {
             synchronized (FamilyAccess.class) {
@@ -269,7 +288,7 @@ public final class FamilyAccess {
                 else if (!FamilyConnectionMonitor.hasNetwork()) schedulePoll(30);
                 else begin("config", null, true);
             }
-        }, seconds, TimeUnit.SECONDS);
+        }, delay, TimeUnit.MILLISECONDS);
     }
 
     /** Fail closed; native transport is stopped before failure notification. */
@@ -419,25 +438,18 @@ public final class FamilyAccess {
                 }
             }
         }
-        return validGateway(response.getJSONObject("gateway"));
+        JSONObject gateway = validGateway(response.getJSONObject("gateway"));
+        if ("reality".equals(gateway.getString("security")) && !routeFailoverEnabled())
+            throw new AccessFailure("invalid_gateway", 0);
+        return gateway;
     }
 
     private static synchronized JSONObject selectRoute(JSONObject primary, JSONObject response) throws Exception {
-        long now = SystemClock.elapsedRealtime();
-        if (routeFailureSince != 0 && now - routeFailureSince >= 30_000
-                && retryPrimaryAt == 0 && !FamilyConnectionMonitor.callActive()) {
-            retryPrimaryAt = now + 600_000;
-            routeFailureSince = 0;
-            FamilyConnectionMonitor.routeChanged("reality");
-        }
-        if (retryPrimaryAt > now) return validGateway(response.getJSONObject("gateway"));
-        if (retryPrimaryAt != 0) {
-            if (FamilyConnectionMonitor.callActive()) return validGateway(response.getJSONObject("gateway"));
-            retryPrimaryAt = 0;
-            routeFailureSince = 0;
-            FamilyConnectionMonitor.routeChanged("wss");
-        }
-        return primary;
+        boolean wasFallback = routeFailover.usingFallback();
+        boolean fallback = routeFailover.select(SystemClock.elapsedRealtime(),
+                FamilyConnectionMonitor.callActive(), routeFailoverEnabled());
+        if (fallback != wasFallback) FamilyConnectionMonitor.routeChanged(fallback ? "reality" : "wss");
+        return fallback ? validGateway(response.getJSONObject("gateway")) : primary;
     }
 
     private static JSONObject validGateway(JSONObject source) throws Exception {

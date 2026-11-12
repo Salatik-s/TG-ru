@@ -41,5 +41,11 @@
     <string name="fg_history_summary">Сохранение удалённых сообщений и изменений</string>
     <string name="fg_plugins_summary">Расширения и их разрешения</string>
     <string name="fg_connection_details">Сведения о подключении</string>
+    <string name="fg_route_settings_summary">Резервное соединение REALITY</string>
+    <string name="fg_route_title">Автопереключение соединения</string>
+    <string name="fg_route_explanation">Если Telegram не подключается 10 секунд, TG-ru попробует резервное соединение REALITY. Через 10 минут приложение попробует вернуться на обычное соединение.</string>
+    <string name="fg_route_consent">Если Telegram не подключается 10 секунд, TG-ru может перейти на резервное соединение REALITY. Через 10 минут приложение попробует вернуться на обычное соединение. Разрешить автопереключение? Решение можно изменить в настройках в разделе «Соединение».</string>
+    <string name="fg_route_allow">Разрешить</string>
+    <string name="fg_route_decline">Не разрешать</string>
     <string name="fg_hide_details">Скрыть сведения</string>
 </resources>

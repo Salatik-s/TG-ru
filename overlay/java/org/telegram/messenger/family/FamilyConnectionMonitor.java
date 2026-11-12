@@ -114,6 +114,8 @@ public final class FamilyConnectionMonitor {
 
     static void routeChanged(String route) { record("route " + route); }
 
+    static int transportState() { return telegramState; }
+
     static boolean callActive() {
         try {
             return Class.forName("org.telegram.messenger.voip.VoIPService")
