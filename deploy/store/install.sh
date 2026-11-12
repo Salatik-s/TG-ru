@@ -71,7 +71,7 @@ if [[ -e $base/current || -L $base/current ]]; then
     [[ $previous =~ ^/opt/tg-ru-store/releases/release\.[A-Za-z0-9]{8}$ &&
         -f $previous/deploy/store/compose.yaml && -f $previous/TG-ru.apk ]] || die 'Unexpected previous Store release.'
 fi
-if [[ -z $previous ]] && ss -H -ltn '( sport = :48185 or sport = :48186 or sport = :28443 )' | grep -q .; then
+if [[ -z $previous ]] && ss -H -ltn '( sport = :48185 or sport = :48186 or sport = :28443 or sport = :28445 )' | grep -q .; then
     die 'At least one dedicated Store port is already in use.'
 fi
 
@@ -225,9 +225,13 @@ for attempt in {1..10}; do
     sleep 1
 done
 (( published )) || die 'Store HTTPS checks failed.'
+[[ $(https -sS -o /dev/null -w '%{http_code}' "https://$domain/v1/store-transport") == 404 ]] ||
+    die 'Store WSS endpoint did not reject an ordinary HTTPS request.'
+compose "$release" exec -T gateway node /app/deploy/store/verify.mjs --wss ||
+    die 'Store WSS over HTTPS did not deliver an MTProto response.'
 https -fsS "https://$domain/index.html" -o "$staging/legacy-after.html"
 cmp -s "$staging/legacy-before.html" "$staging/legacy-after.html" ||
     die 'Existing Android update metadata changed.'
 [[ $(legacy_download_status) == 401 ]] || die 'The existing protected download endpoint changed.'
 legacy_gateway || die 'The existing FamilyGram gateway stopped responding.'
-printf '%s\n' 'Store published. Encrypted MTProto, Store HTTPS, and unchanged legacy endpoints verified from the host.'
+printf '%s\n' 'Store published. REALITY and WSS both delivered MTProto. Store HTTPS and legacy endpoints verified.'

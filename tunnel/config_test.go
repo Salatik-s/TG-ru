@@ -114,3 +114,26 @@ func TestEngineLifecycle(t *testing.T) {
 		t.Fatal("dial after close")
 	}
 }
+
+func TestStoreWSSProfile(t *testing.T) {
+	c := Config{Protocol: "vless", Host: "tg.24projects.ru", Port: 443, UUID: testConfig().UUID,
+		Security: "tls", ServerName: "tg.24projects.ru", Transport: "ws", Path: "/v1/store-transport"}
+	b, err := c.XrayJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !json.Valid(b) {
+		t.Fatal("invalid generated Xray config")
+	}
+	for _, change := range []func(*Config){
+		func(c *Config) { c.Port = 28445 },
+		func(c *Config) { c.Path = "/v1/transport" },
+		func(c *Config) { c.ServerName = "example.org" },
+	} {
+		invalid := c
+		change(&invalid)
+		if invalid.Validate() == nil {
+			t.Fatal("accepted an unexpected Store endpoint")
+		}
+	}
+}

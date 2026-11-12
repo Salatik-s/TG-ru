@@ -115,6 +115,13 @@ test('isolated Gateway is Telegram-only and adds aggregate stats exclusively for
   assert.equal(proxiedQa.routing.rules[0].outboundTag, 'test-socks');
   assert.deepEqual(proxiedQa.outbounds[1].settings.servers, [{ address: '127.0.0.1', port: 10808 }]);
   assert.deepEqual(xrayConfig(config, []).inbounds.map(({ port }) => port), [18443, 10000]);
+  const wss = xrayConfig(config, [{ uuid: 'b1aa101b-b106-42df-ad6a-5af60a1e82fa' }], null,
+    { ...options, listenAddress: '0.0.0.0', storeWssPort: 28445 });
+  assert.equal(wss.inbounds[1].listen, '127.0.0.1');
+  assert.equal(wss.inbounds[1].streamSettings.wsSettings.path, '/v1/store-transport');
+  assert.equal(wss.inbounds[1].settings.clients[0].id, wss.inbounds[0].settings.clients[0].id);
+  assert.equal(wss.inbounds[1].settings.clients[0].flow, undefined);
+  assert.deepEqual(wss.routing, production.routing);
 });
 
 async function allocatePort() {
@@ -131,11 +138,11 @@ test('real isolated Xray starts with the admitted UUID and removes it on expiry'
   const dir = mkdtempSync(join(tmpdir(), 'tg-ru-store-gateway-test-'));
   const key = generateKeyPairSync('x25519');
   const gateway = new Gateway({
-    host: '127.0.0.1', serverName: 'www.microsoft.com', shortId: randomBytes(8).toString('hex'),
+    host: 'tg.24projects.ru', serverName: 'www.microsoft.com', shortId: randomBytes(8).toString('hex'),
     privateKey: key.privateKey.export({ format: 'jwk' }).d,
     publicKey: key.publicKey.export({ format: 'jwk' }).x
   }, dir, process.env.XRAY_TEST_BINARY, {
-    listenAddress: '127.0.0.1', realityOnly: true, realityPort: await allocatePort(),
+    listenAddress: '127.0.0.1', realityOnly: true, realityPort: await allocatePort(), storeWssPort: await allocatePort(),
     destinationCidrs: TELEGRAM_CIDRS, allowDirectForTests: true, qaStatsPort: await allocatePort()
   });
   const { request, errors } = await start(t, gateway);
@@ -143,7 +150,11 @@ test('real isolated Xray starts with the admitted UUID and removes it on expiry'
   const deadline = nowSeconds() + 3;
   const response = await request(claims({ lease: deadline }));
   assert.equal(response.status, 200);
-  assert.equal((await response.json()).gateway.port, gateway.options.realityPort);
+  const { gateway: profile } = await response.json();
+  assert.equal(profile.port, gateway.options.realityPort);
+  assert.equal(profile.wss.uuid, profile.uuid);
+  assert.equal(profile.wss.port, 443);
+  assert.equal(profile.wss.host, 'tg.24projects.ru');
   const admittedChild = gateway.child;
   await delay(Math.max(200, (deadline + 1) * 1000 - Date.now()));
   assert.notEqual(gateway.child, admittedChild);

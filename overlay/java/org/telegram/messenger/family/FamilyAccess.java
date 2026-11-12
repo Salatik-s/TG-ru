@@ -471,13 +471,15 @@ public final class FamilyAccess {
         String uuid = source.getString("uuid");
         if (port < 1 || port > 65535 || !UUID.fromString(uuid).toString().equalsIgnoreCase(uuid)) throw new AccessFailure("invalid_gateway", 0);
         if ("tls".equals(source.optString("security")) && "ws".equals(source.optString("transport"))) {
-            if (!"24projects.ru".equals(host) || !host.equals(sni) || port != 8443
-                    || !"/v1/transport".equals(source.optString("path"))
+            String path = source.optString("path");
+            boolean legacy = "24projects.ru".equals(host) && port == 8443 && "/v1/transport".equals(path);
+            boolean store = "tg.24projects.ru".equals(host) && port == 443 && "/v1/store-transport".equals(path);
+            if ((!legacy && !store) || !host.equals(sni)
                     || !source.optString("flow").isEmpty() || !source.optString("fingerprint").isEmpty()) {
                 throw new AccessFailure("invalid_gateway", 0);
             }
             return new JSONObject().put("protocol", "vless").put("host", host).put("port", port).put("uuid", uuid)
-                    .put("security", "tls").put("transport", "ws").put("path", "/v1/transport")
+                    .put("security", "tls").put("transport", "ws").put("path", path)
                     .put("server_name", sni).put("flow", "").put("fingerprint", "");
         }
         if (!"reality".equals(source.optString("security")) || !"xtls-rprx-vision".equals(source.optString("flow"))

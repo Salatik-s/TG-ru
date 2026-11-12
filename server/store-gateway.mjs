@@ -138,7 +138,9 @@ export function createStoreGateway({ secret, gateway, selectedRoute = () => null
         await reload();
         throw failure;
       }
-      return { gateway: gateway.client(lease) };
+      const profile = gateway.client(lease);
+      if (gateway.options?.storeWssPort) profile.wss = gateway.storeWss(lease);
+      return { gateway: profile };
     } finally {
       scheduleExpiry();
     }

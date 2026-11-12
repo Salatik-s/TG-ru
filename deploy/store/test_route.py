@@ -55,6 +55,13 @@ class StoreRoutingTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 render(unexpected)
 
+    def test_store_wss_has_its_own_loopback_upstream(self):
+        output = render(LEGACY)
+        ws = output.split("    location = /v1/store-transport {", 1)[1].split("\n    }", 1)[0]
+        self.assertIn("proxy_pass http://127.0.0.1:28445;", ws)
+        self.assertIn("proxy_set_header Upgrade $http_upgrade;", ws)
+        self.assertIn("return 404", ws)
+
 
 if __name__ == "__main__":
     unittest.main()

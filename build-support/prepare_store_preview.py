@@ -13,8 +13,8 @@ PREVIEW20 = "de059a2365b83d09e8abb72d564852110a7f60941c364eb7a0633a6d74818b94"
 ACTIVITY = "org.telegram.messenger.family.FamilyStoreGateActivity"
 MARKER = "org.telegram.messenger.family.STORE"
 LOCAL_MARKER = MARKER + "_LOCAL_QA"
-VERSION_CODE = 10023
-VERSION_NAME = "0.1.0-preview22-store"
+VERSION_CODE = 10024
+VERSION_NAME = "0.1.0-preview23-store"
 
 
 def main():

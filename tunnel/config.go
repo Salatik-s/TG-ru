@@ -55,7 +55,9 @@ func (c Config) Validate() error {
 		return errors.New("invalid device UUID")
 	}
 	if c.Security == "tls" {
-		if c.Transport != "ws" || c.Host != "24projects.ru" || c.ServerName != c.Host || c.Port != 8443 || c.Path != "/v1/transport" || c.Flow != "" || c.Fingerprint != "" || c.PublicKey != "" || c.ShortID != "" {
+		legacy := c.Host == "24projects.ru" && c.Port == 8443 && c.Path == "/v1/transport"
+		store := c.Host == "tg.24projects.ru" && c.Port == 443 && c.Path == "/v1/store-transport"
+		if c.Transport != "ws" || (!legacy && !store) || c.ServerName != c.Host || c.Flow != "" || c.Fingerprint != "" || c.PublicKey != "" || c.ShortID != "" {
 			return errors.New("invalid private WSS profile")
 		}
 		return nil

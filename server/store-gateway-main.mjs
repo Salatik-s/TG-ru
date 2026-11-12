@@ -39,10 +39,12 @@ const host = process.env.STORE_GATEWAY_HOST ?? (qa ? '127.0.0.1' : '');
 const controlPort = port('STORE_GATEWAY_CONTROL_PORT', 48186);
 const realityPort = port('STORE_GATEWAY_REALITY_PORT', 28443);
 const qaStatsPort = qa ? port('STORE_GATEWAY_QA_STATS_PORT', 28444) : null;
+const storeWssPort = qa ? null : 28445;
 const qaSocksPort = qa && process.env.STORE_GATEWAY_QA_SOCKS_PORT ? port('STORE_GATEWAY_QA_SOCKS_PORT') : null;
 const hex = process.env.STORE_GATEWAY_SECRET ?? '';
 if (!/^[a-f0-9]{64}$/.test(hex)) throw new Error('STORE_GATEWAY_SECRET must contain 64 lowercase hexadecimal characters');
-if (new Set([controlPort, realityPort, qaStatsPort]).size !== 3) throw new Error('Store Gateway ports must differ');
+const ports = [controlPort, realityPort, qaStatsPort, storeWssPort].filter(value => value !== null);
+if (new Set(ports).size !== ports.length) throw new Error('Store Gateway ports must differ');
 if ([controlPort, realityPort, qaStatsPort].includes(qaSocksPort) && qaSocksPort !== null) throw new Error('QA SOCKS port must differ');
 if (qa && host !== '127.0.0.1') throw new Error('QA only advertises loopback');
 if (!qa && (isIP(host) || !/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z]{2,}$/i.test(host))) {
@@ -55,7 +57,7 @@ const dir = resolve(process.env.STORE_GATEWAY_DIR, 'store-gateway');
 mkdirSync(dir, { recursive: true, mode: 0o700 });
 const gateway = new Gateway({ host, serverName: 'www.microsoft.com', ...keys(dir) }, dir, process.env.XRAY_BINARY, {
   allowDirectForTests: qa, realityPort, listenAddress: qa ? '127.0.0.1' : '0.0.0.0',
-  realityOnly: true, destinationCidrs: TELEGRAM_CIDRS, qaStatsPort, qaSocksPort
+  realityOnly: true, destinationCidrs: TELEGRAM_CIDRS, qaStatsPort, qaSocksPort, storeWssPort
 });
 
 let egress;

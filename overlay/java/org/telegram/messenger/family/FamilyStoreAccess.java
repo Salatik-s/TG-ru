@@ -229,11 +229,22 @@ public final class FamilyStoreAccess {
         }
         String gateway;
         try {
-            JSONObject profile = FamilyAccess.validGateway(result.getJSONObject("gateway"));
+            JSONObject issued = result.getJSONObject("gateway");
+            JSONObject profile = FamilyAccess.validGateway(issued);
             if (!"reality".equals(profile.getString("security"))
                     || !(local ? "127.0.0.1" : "tg.24projects.ru").equals(profile.getString("host"))
                     || profile.getInt("port") != REALITY_PORT) {
                 throw new ActivationFailure("bad_response");
+            }
+            JSONObject wss = issued.optJSONObject("wss");
+            if (!local && wss != null) {
+                JSONObject alternate = FamilyAccess.validGateway(wss);
+                if (!"tg.24projects.ru".equals(alternate.getString("host"))
+                        || !"tls".equals(alternate.getString("security"))
+                        || !profile.getString("uuid").equalsIgnoreCase(alternate.getString("uuid"))) {
+                    throw new ActivationFailure("bad_response");
+                }
+                profile = alternate;
             }
             gateway = profile.toString();
         } catch (Exception invalid) {

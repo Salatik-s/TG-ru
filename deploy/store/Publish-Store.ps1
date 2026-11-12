@@ -9,7 +9,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
-if (-not $ApkPath) { $ApkPath = Join-Path $repo 'release/TG-ru-preview22-store-public.apk' }
+if (-not $ApkPath) { $ApkPath = Join-Path $repo 'release/TG-ru-preview23-store-public.apk' }
 $sdk = Join-Path $env:LOCALAPPDATA 'Android/Sdk/build-tools/37.0.0'
 $java = Join-Path $env:LOCALAPPDATA 'Programs/Android Studio/jbr/bin/java.exe'
 $aapt = Join-Path $sdk 'aapt.exe'
@@ -63,7 +63,7 @@ $metadata = [ordered]@{
 if ($ExpectedSha256 -and $metadata.sha256 -ne $ExpectedSha256) { throw 'Store APK SHA-256 differs from the requested artifact.' }
 
 Write-Host "Verified Store APK $versionName ($versionCode), SHA-256 $($metadata.sha256)."
-Write-Host 'Publishes the Store website, console-managed access, and new APK on tg.24projects.ru.'
+Write-Host 'Publishes the Store website, HTTPS transport, and current APK on tg.24projects.ru.'
 Write-Host 'The legacy APK, legacy update metadata and legacy gateway ports retain their existing routes.'
 if ($PlanOnly) {
     Write-Host 'Local validation passed. Host access and publication are pending.'

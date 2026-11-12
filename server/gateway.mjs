@@ -5,7 +5,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 export function xrayConfig(config, devices, route=null, {
   allowDirectForTests=false, realityPort=18443, listenAddress='0.0.0.0', realityOnly=false, destinationCidrs=null,
-  qaStatsPort=null, qaSocksPort=null
+  qaStatsPort=null, qaSocksPort=null, storeWssPort=null
 }={}) {
   const outbound=route?.outbound?structuredClone(route.outbound):null;
   if(outbound&&!['vless','trojan','shadowsocks'].includes(outbound.protocol))throw new Error('Invalid encrypted egress');
@@ -24,8 +24,8 @@ export function xrayConfig(config, devices, route=null, {
       streamSettings:{network:'tcp',security:'reality',realitySettings:{show:false,target:`${config.serverName}:443`,xver:0,serverNames:[config.serverName],privateKey:config.privateKey,shortIds:[config.shortId]}},
       sniffing:{enabled:true,destOverride:['http','tls'],routeOnly:true}},
       // TLS terminates at the existing HTTPS nginx. This port is container-network only.
-      ...(realityOnly?[]:[{tag:'family-ws',listen:'0.0.0.0',port:10000,protocol:'vless',settings:{clients:devices.map(d=>({id:d.uuid})),decryption:'none'},
-        streamSettings:{network:'ws',security:'none',wsSettings:{path:'/v1/transport'}},
+      ...(realityOnly&&!storeWssPort?[]:[{tag:'family-ws',listen:storeWssPort?'127.0.0.1':'0.0.0.0',port:storeWssPort??10000,protocol:'vless',settings:{clients:devices.map(d=>({id:d.uuid})),decryption:'none'},
+        streamSettings:{network:'ws',security:'none',wsSettings:{path:storeWssPort?'/v1/store-transport':'/v1/transport'}},
         sniffing:{enabled:true,destOverride:['http','tls'],routeOnly:true}}])],
     outbounds:[{tag:'block',protocol:'blackhole'},...(outbound?[outbound]:allowDirectForTests?[qaOutbound]:[])],
     routing:destinationCidrs?{domainStrategy:'AsIs',rules:[
@@ -85,7 +85,8 @@ export class Gateway {
       await delay(100);
       if(this.closed||revision!==this.revision)return;
       if (failed) throw new Error('Gateway failed to start');
-      const ports=this.options.realityOnly?[this.options.realityPort??18443]:[this.options.realityPort??18443,10000];
+      const ports=[this.options.realityPort??18443];
+      if(this.options.storeWssPort||!this.options.realityOnly)ports.push(this.options.storeWssPort??10000);
       const listening=await Promise.all(ports.map(port=>new Promise(resolve=>{const s=createConnection({host:'127.0.0.1',port});s.once('connect',()=>{s.destroy();resolve(true);});s.once('error',()=>resolve(false));s.setTimeout(100,()=>{s.destroy();resolve(false);});})));
       if (listening.every(Boolean)) {this.listening=true;this.ready=Boolean(route?.outbound||this.options.allowDirectForTests);return;}
     }
@@ -96,5 +97,8 @@ export class Gateway {
   }
   clientFallbacks(device) {
     return [{protocol:'vless',host:this.config.host,port:8443,uuid:device.uuid,security:'tls',transport:'ws',path:'/v1/transport',server_name:this.config.host,flow:'',fingerprint:''}];
+  }
+  storeWss(device) {
+    return {protocol:'vless',host:this.config.host,port:443,uuid:device.uuid,security:'tls',transport:'ws',path:'/v1/store-transport',server_name:this.config.host,flow:'',fingerprint:''};
   }
 }
