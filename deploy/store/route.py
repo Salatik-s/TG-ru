@@ -10,7 +10,8 @@ END = "    # END TG-ru Store"
 OLD_ROOT = "    location = / { try_files /index.html =404; }"
 STORE_ROUTES = (
     "register|login|recover|cabinet|account|devices|downloads|help|checkout|visibility|"
-    "terms|privacy|refunds|compatibility|store\\.css|store\\.mjs|fonts/inter-(cyrillic|latin)\\.woff2"
+    "terms|privacy|refunds|compatibility|store\\.css|store\\.mjs|"
+    "preview-(home|header|cabinet)\\.css|tg-ru-mark\\.png|fonts/inter-(cyrillic|latin)\\.woff2"
 )
 
 
@@ -23,6 +24,7 @@ def routes():
         "        proxy_connect_timeout 3s;\n"
         "        proxy_read_timeout 20s;\n"
         "        client_max_body_size 24k;\n"
+        "        access_log off;\n"
         '        add_header X-Robots-Tag "noindex, nofollow" always;\n'
     )
     return (
@@ -35,7 +37,6 @@ def routes():
         "    location = /downloads/TG-ru.apk {\n"
         "        limit_req zone=tg_ru_store_downloads burst=5 nodelay;\n"
         "        limit_req_status 429;\n"
-        "        access_log off;\n"
         "        error_log /dev/null crit;\n"
         + backend + "    }\n"
         "    location = /v1/store-transport {\n"

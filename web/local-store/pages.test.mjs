@@ -18,8 +18,8 @@ test('Store registration, trial and support use server-rendered forms', async (t
 
   const base = 'http://127.0.0.1:' + server.address().port;
   const home = await (await fetch(base)).text();
-  assert.match(home, /name="color-scheme" content="dark"/);
-  assert.match(home, /rel="icon" type="image\/png" sizes="32x32" href="data:image\/png;base64,/);
+  assert.match(home, /name="color-scheme" content="light"/);
+  assert.match(home, /rel="icon" type="image\/png" sizes="736x736" href="\/tg-ru-mark\.png"/);
   assert.doesNotMatch(home, /id="theme"|content="dark light"/);
   for (const [route, text] of [
     ['/terms', /Проба, цена и срок/],
@@ -86,7 +86,7 @@ test('Store registration, trial and support use server-rendered forms', async (t
   const overview = await fetch(base + '/cabinet', { headers: { cookie } });
   const overviewBody = await overview.text();
   assert.match(overviewBody, /Попробовать 5 часов бесплатно/);
-  assert.match(overviewBody, /<h2>Платежи<\/h2>/);
+  assert.match(overviewBody, /href="\/devices">Управление устройствами<\/a>/);
   const trialToken = overviewBody.match(/name="csrf" value="([^"]+)"/)?.[1];
   const trial = await post('/form/trial', { csrf: trialToken }, cookie);
   assert.equal(trial.status, 303);
@@ -252,6 +252,9 @@ test('public Store downloads require a matching logged-in session and a fresh si
     req.end(fields ? new URLSearchParams(fields).toString() : undefined);
   });
   assert.equal((await request('/downloads')).headers.get('location'), '/login');
+  assert.deepEqual(await (await request('/api/store/release')).json(), {
+    ok: true, version_code: 10023, version_name: release.version_name, min_sdk: 24,
+  });
   const landing = await (await request('/')).text();
   const hero = landing.match(/<section class="wrap hero">[\s\S]*?<\/section>/)[0];
   assert.match(hero, /href="\/register">Создать аккаунт<\/a>[\s\S]*href="\/login">Войти<\/a>/);

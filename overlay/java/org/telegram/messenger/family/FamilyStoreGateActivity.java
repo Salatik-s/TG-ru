@@ -15,6 +15,8 @@ import android.graphics.drawable.StateListDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.SystemClock;
 import android.text.Editable;
 import android.text.InputFilter;
@@ -28,10 +30,12 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.Space;
 import android.widget.TextView;
+import org.telegram.messenger.R;
 
 import java.text.DateFormat;
 import java.util.Date;
@@ -39,7 +43,7 @@ import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/** Store onboarding for the explicitly enabled Android QA build. */
+/** Store onboarding and recovery for a linked installation. */
 public final class FamilyStoreGateActivity extends FamilyUi {
     private static final String SEEN = "store_welcome_seen";
     private static final String PRIVACY_OPEN = "store_privacy_open";
@@ -70,6 +74,19 @@ public final class FamilyStoreGateActivity extends FamilyUi {
     private long nextRefreshAt;
     private ScrollView scroll;
     private View glow;
+    private final Handler main = new Handler(Looper.getMainLooper());
+    private final Runnable watchAccess = new Runnable() {
+        @Override public void run() {
+            if (!working && login == null && submit != null) {
+                if (FamilyStoreAccess.isActive(FamilyStoreGateActivity.this)) {
+                    openTelegram();
+                    return;
+                }
+                if (!FamilyStoreAccess.hasDevice(FamilyStoreGateActivity.this)) showActivation();
+            }
+            main.postDelayed(this, 1_000);
+        }
+    };
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
@@ -88,6 +105,16 @@ public final class FamilyStoreGateActivity extends FamilyUi {
         out.putBoolean(PRIVACY_OPEN, privacyOpen);
     }
 
+    @Override protected void onResume() {
+        super.onResume();
+        main.post(watchAccess);
+    }
+
+    @Override protected void onPause() {
+        main.removeCallbacks(watchAccess);
+        super.onPause();
+    }
+
     @Override public void onBackPressed() {
         if (privacyOpen) showWelcome();
         else super.onBackPressed();
@@ -95,7 +122,7 @@ public final class FamilyStoreGateActivity extends FamilyUi {
 
     private void renderStart() {
         if (FamilyStoreAccess.isActive(this)) {
-            showSuccess(FamilyStoreAccess.accessUntil(this));
+            openTelegram();
         } else if (FamilyStoreAccess.hasDevice(this)) {
             showAccessStatus();
         } else if (getPreferences(MODE_PRIVATE).getBoolean(SEEN, false)) {
@@ -108,10 +135,10 @@ public final class FamilyStoreGateActivity extends FamilyUi {
     private void showWelcome() {
         beginScreen("Прежде чем начать");
         mark(false);
-        title("Прежде чем начать", "Коротко о том, как работает TG-ru.", 24);
-        card(Icon.INFO, "О приложении", "TG-ru — неофициальный клиент Telegram.");
-        card(Icon.ARROW, "Как идёт трафик", "При подключении через шлюз TG-ru он видит ваш IP, время подключения и объём трафика. Содержимое сообщений зашифровано.");
-        card(Icon.LOCK, "Что остаётся в Telegram", "Номер телефона, код входа и облачный пароль вы вводите отдельно при входе в Telegram.");
+        title("Прежде чем начать", "TG-ru — независимый клиент Telegram со своим VPN-шлюзом.", 24);
+        card(Icon.INFO, "Вход в TG-ru", "Сначала войдите с логином и паролем от кабинета TG-ru.");
+        card(Icon.PHONE, "Вход в Telegram", "На следующем этапе Telegram попросит номер телефона и код входа.");
+        card(Icon.LOCK, "Что видит шлюз", "Шлюзу доступны IP, время подключения и объём трафика. Сообщения проходят через него в зашифрованном виде.");
         feedback = feedback();
         bottomActions();
         action("Понятно", true).setOnClickListener(view -> acceptWelcome());
@@ -172,12 +199,12 @@ public final class FamilyStoreGateActivity extends FamilyUi {
 
     private void showAccessStatus() {
         boolean expired = FamilyStoreAccess.accessUntil(this) <= System.currentTimeMillis() / 1000;
-        String heading = expired ? "Доступ закончился" : "Проверка доступа";
+        String heading = expired ? "Доступ закончился" : "Подключаем TG-ru";
         beginScreen(heading);
         mark(false);
         title(heading, expired
                 ? "Для продления доступа обратитесь в поддержку. Контакт есть в кабинете."
-                : "Проверьте соединение и повторите проверку доступа.", 24);
+                : "Когда появится интернет, приложение подключится автоматически.", 24);
         feedback = feedback();
         bottomActions();
         action("Открыть кабинет", true).setOnClickListener(view -> openBrowser("/account"));
@@ -194,17 +221,19 @@ public final class FamilyStoreGateActivity extends FamilyUi {
         card(Icon.PHONE, "Дальше", "В Telegram можно войти по номеру телефона или открыть уже добавленный аккаунт.");
         feedback = feedback();
         bottomActions();
-        action("Открыть Telegram", true).setOnClickListener(view -> {
-            if (!FamilyStoreAccess.isActive(this)) {
-                showAccessStatus();
-                return;
-            }
-            Intent intent = new Intent().setClassName(getPackageName(), LAUNCH_ACTIVITY)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-            startActivity(intent);
-            finish();
-        });
+        action("Открыть Telegram", true).setOnClickListener(view -> openTelegram());
         action("Открыть кабинет", false).setOnClickListener(view -> openBrowser("/account"));
+    }
+
+    private void openTelegram() {
+        if (!FamilyStoreAccess.isActive(this)) {
+            showAccessStatus();
+            return;
+        }
+        Intent intent = new Intent().setClassName(getPackageName(), LAUNCH_ACTIVITY)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
+        finish();
     }
 
     private void activate() {
@@ -371,11 +400,9 @@ public final class FamilyStoreGateActivity extends FamilyUi {
             view.setBackground(shape(0x1F4CC38A, 36, Color.TRANSPARENT, 0));
         } else {
             size = 56;
-            TextView brand = label("TG", 20, ON_BLUE);
-            brand.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-            brand.setGravity(Gravity.CENTER);
-            brand.setLetterSpacing(-0.025f);
-            brand.setBackground(shape(BLUE, 16, Color.TRANSPARENT, 0));
+            ImageView brand = new ImageView(this);
+            brand.setImageResource(R.drawable.exteraless_icon);
+            brand.setScaleType(ImageView.ScaleType.FIT_CENTER);
             view = brand;
         }
         view.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);

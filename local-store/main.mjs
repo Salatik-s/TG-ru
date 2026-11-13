@@ -6,7 +6,7 @@ import { gatewayClient } from './gateway-client.mjs';
 
 const host = '127.0.0.1';
 const port = 48185;
-const pages = new URL('../web/local-store/pages.mjs', import.meta.url);
+const pages = new URL('../web/local-store/preview-pages.mjs', import.meta.url);
 const mockPayments = process.env.TG_RU_STORE_MOCK_PAYMENTS === '1';
 const secret = process.env.STORE_GATEWAY_SECRET;
 const publicOrigin = process.env.TG_RU_STORE_PUBLIC_ORIGIN;
@@ -30,11 +30,11 @@ const authorizeGateway = secret === undefined ? undefined : gatewayClient({
 });
 
 mkdirSync(dirname(storeDatabase), { recursive: true });
-const { handleStorePages } = existsSync(pages) ? await import(pages) : {};
+const { handlePreviewPages } = existsSync(pages) ? await import(pages) : {};
 const server = createStoreServer({
   database: storeDatabase,
   allowMockPurchases: mockPayments,
-  pagesHandler: handleStorePages,
+  pagesHandler: handlePreviewPages,
   authorizeGateway,
   publicOrigin,
   release,

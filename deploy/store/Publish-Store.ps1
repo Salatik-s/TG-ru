@@ -9,7 +9,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
-if (-not $ApkPath) { $ApkPath = Join-Path $repo 'release/TG-ru-preview23-store-public.apk' }
+if (-not $ApkPath) { $ApkPath = Join-Path $repo 'release/TG-ru-preview25-store-public.apk' }
 $sdk = Join-Path $env:LOCALAPPDATA 'Android/Sdk/build-tools/37.0.0'
 $java = Join-Path $env:LOCALAPPDATA 'Programs/Android Studio/jbr/bin/java.exe'
 $aapt = Join-Path $sdk 'aapt.exe'
@@ -23,6 +23,9 @@ $paths = @(
     'local-store/schema.sql','local-store/manual-grants.sql',
     'local-store/gateway-client.mjs','local-store/owner.mjs','local-store/owner-auth.mjs',
     'web/local-store/pages.mjs','web/local-store/store.css','web/local-store/store.mjs',
+    'web/local-store/preview-pages.mjs','web/local-store/preview-home.html','web/local-store/preview-home.css',
+    'web/local-store/preview-header.mjs','web/local-store/preview-footer.mjs',
+    'web/local-store/preview-header.css','web/local-store/preview-cabinet.css','web/local-store/tg-ru-mark.png',
     'web/local-store/Inter-OFL.txt','web/local-store/inter-cyrillic.woff2','web/local-store/inter-latin.woff2','i18n/ru.json'
 )
 $apk = (Resolve-Path -LiteralPath $ApkPath).Path
@@ -91,7 +94,7 @@ try {
     & ssh.exe -t -- $SshTarget $remoteCommand
     if ($LASTEXITCODE -ne 0) { throw "Store deployment failed. Uploaded release retained at $remote for review." }
     $site = & curl.exe -fsS --max-time 12 "https://$hostName/"
-    if ($LASTEXITCODE -ne 0 -or ($site -join "`n") -notmatch 'href="/store\.css"') {
+    if ($LASTEXITCODE -ne 0 -or ($site -join "`n") -notmatch 'href="/preview-home\.css"') {
         throw 'The server-local deployment passed, but the public site did not return the Store frontend.'
     }
     $socket = [Net.Sockets.TcpClient]::new()

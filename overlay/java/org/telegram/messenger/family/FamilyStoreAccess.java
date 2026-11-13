@@ -53,6 +53,8 @@ public final class FamilyStoreAccess {
     private static volatile long allowedUntil;
     private static String activeGateway;
     private static final AtomicBoolean refreshStarted = new AtomicBoolean();
+    private static final AtomicBoolean recoveryQueued = new AtomicBoolean();
+    private static volatile ScheduledExecutorService refreshLoop;
 
     private FamilyStoreAccess() { }
 
@@ -85,22 +87,37 @@ public final class FamilyStoreAccess {
         return preferences(context).getLong(ACCESS_UNTIL, 0);
     }
 
+    static boolean hasOfflineAccess(Context context) {
+        return hasDevice(context) && accessUntil(context) > System.currentTimeMillis() / 1000;
+    }
+
     public static void ensureRefreshing(Context context) {
         if (!isConfigured(context) || !refreshStarted.compareAndSet(false, true)) return;
         Context app = context.getApplicationContext();
-        ScheduledExecutorService loop = Executors.newSingleThreadScheduledExecutor(task -> {
+        refreshLoop = Executors.newSingleThreadScheduledExecutor(task -> {
             Thread thread = new Thread(task, "TG-ru store lease");
             thread.setDaemon(true);
             return thread;
         });
-        loop.scheduleWithFixedDelay(() -> {
-            if (!hasDevice(app) || (isActive(app) && allowedUntil > SystemClock.elapsedRealtime() + 30_000)) return;
-            try {
-                refresh(app);
-            } catch (ActivationFailure ignored) {
-                // The existing lease covers transient errors until it expires.
-            }
-        }, 0, 15, TimeUnit.SECONDS);
+        refreshLoop.scheduleWithFixedDelay(() -> refreshIfNeeded(app), 0, 15, TimeUnit.SECONDS);
+    }
+
+    static void networkAvailable(Context context) {
+        ScheduledExecutorService loop = refreshLoop;
+        if (loop == null || !hasDevice(context) || !recoveryQueued.compareAndSet(false, true)) return;
+        loop.execute(() -> {
+            try { refreshIfNeeded(context); }
+            finally { recoveryQueued.set(false); }
+        });
+    }
+
+    private static void refreshIfNeeded(Context context) {
+        if (!hasDevice(context) || !FamilyConnectionMonitor.hasNetwork()
+                || (isActive(context) && allowedUntil > SystemClock.elapsedRealtime() + 30_000)) return;
+        try { refresh(context); }
+        catch (ActivationFailure ignored) {
+            // The existing lease covers transient errors until it expires.
+        }
     }
 
     static boolean hasDevice(Context context) {
@@ -152,6 +169,7 @@ public final class FamilyStoreAccess {
             return saveAccess(context, renewed, publicKey(store));
         } catch (ActivationFailure failure) {
             if ("subscription_expired".equals(failure.code)) {
+                preferences(context).edit().remove(ACCESS_UNTIL).apply();
                 closeTransport();
             } else if ("device_revoked".equals(failure.code) || "device_not_found".equals(failure.code)) {
                 clearDevice(context);

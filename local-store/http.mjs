@@ -1,5 +1,7 @@
 import { createServer } from 'node:http';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { createReadStream } from 'node:fs';
+import { pipeline } from 'node:stream/promises';
 import { createStore, StoreError } from './store.mjs';
 
 const SESSION_COOKIE = '__Host-tgru_store_local';
@@ -88,7 +90,7 @@ function securityHeaders(response) {
   response.setHeader('Cache-Control', 'no-store');
 }
 
-export function createStoreServer({ pagesHandler, publicOrigin, release, ...storeOptions } = {}) {
+export function createStoreServer({ pagesHandler, publicOrigin, release, localApk, ...storeOptions } = {}) {
   if (publicOrigin && publicOrigin !== 'https://tg.24projects.ru') {
     throw new Error('Invalid public Store origin');
   }
@@ -102,9 +104,14 @@ export function createStoreServer({ pagesHandler, publicOrigin, release, ...stor
       const url = storeUrl(request, origin);
       const path = url.pathname;
       const publicSite = origin?.origin === url.origin;
+      const downloadableRelease = publicSite || !origin && localApk ? release : undefined;
       store.purge();
       if (path === '/health' && request.method === 'GET') {
         return json(response, 200, { ok: true, local: true });
+      }
+      if (path === '/api/store/release' && request.method === 'GET' && downloadableRelease) {
+        const { version_code, version_name, min_sdk } = downloadableRelease;
+        return json(response, 200, { ok: true, version_code, version_name, min_sdk });
       }
       if (path.startsWith('/form/owner/')) {
         response.setHeader('X-Robots-Tag', 'noindex, nofollow');
@@ -137,7 +144,7 @@ export function createStoreServer({ pagesHandler, publicOrigin, release, ...stor
       }
 
       let session = store.findSession(cookieValue(request));
-      if (publicSite && release && path === '/form/download' && request.method === 'POST') {
+      if (downloadableRelease && path === '/form/download' && request.method === 'POST') {
         if (!/^application\/x-www-form-urlencoded(?:\s*;|$)/i.test(request.headers['content-type'] ?? '')) {
           throw new StoreError(415, 'unsupported_media_type');
         }
@@ -155,7 +162,7 @@ export function createStoreServer({ pagesHandler, publicOrigin, release, ...stor
         response.end();
         return;
       }
-      if (publicSite && release && path === DOWNLOAD_PATH && request.method === 'GET') {
+      if (downloadableRelease && path === DOWNLOAD_PATH && request.method === 'GET') {
         const issued = session?.accountId && tickets.get(session.rawToken);
         const ticket = url.searchParams.get('ticket') ?? '';
         if (!issued || issued.expiresAt <= clock() || !/^[A-Za-z0-9_-]{43}$/.test(ticket)
@@ -163,6 +170,15 @@ export function createStoreServer({ pagesHandler, publicOrigin, release, ...stor
           throw new StoreError(403, 'download_ticket_invalid');
         }
         tickets.delete(session.rawToken);
+        if (!publicSite) {
+          response.writeHead(200, {
+            'Content-Type': 'application/vnd.android.package-archive',
+            'Content-Disposition': 'attachment; filename="TG-ru.apk"',
+            'Content-Length': downloadableRelease.bytes,
+          });
+          await pipeline(createReadStream(localApk), response);
+          return;
+        }
         response.writeHead(200, { 'X-Accel-Redirect': '/_tg_ru_store_apk' });
         response.end();
         return;
@@ -203,7 +219,7 @@ export function createStoreServer({ pagesHandler, publicOrigin, release, ...stor
         return json(response, 200, { ok: true, ...await store.deviceAction(action, data) });
       }
       if (pagesHandler && await pagesHandler(request, response, {
-        getSession, submit, release: publicSite ? release : undefined,
+        getSession, submit, release: downloadableRelease,
       })) return;
       throw new StoreError(404, 'not_found');
     } catch (error) {

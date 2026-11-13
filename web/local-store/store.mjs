@@ -63,7 +63,10 @@
 
     const error = document.querySelector('[role="alert"][tabindex="-1"]');
     if (error) error.focus();
-    for (const form of document.querySelectorAll('form[method="post"]')) {
+    const checksum = document.getElementById('download-checksum');
+    if (checksum && location.hash === '#download-checksum') checksum.open = true;
+
+    for (const form of document.querySelectorAll('form[method="post"]:not([data-download])')) {
       form.addEventListener('submit', (event) => {
         if (!event.submitter) return;
         if (form.dataset.pending === 'true') {

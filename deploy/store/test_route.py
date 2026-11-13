@@ -29,6 +29,12 @@ server {
 
 
 class StoreRoutingTest(unittest.TestCase):
+    def test_store_account_requests_skip_access_log(self):
+        output = render(LEGACY)
+        account_routes = output.split("    location ~ ^/(form|api/store)/ {", 1)[1].split("    }", 1)[0]
+        self.assertIn("access_log off;", account_routes)
+        self.assertIn("limit_req zone=tg_ru_store_requests", account_routes)
+
     def test_preserves_legacy_routes_and_certificate_challenges(self):
         output = render(LEGACY)
         self.assertIn(LEGACY_APK, output)

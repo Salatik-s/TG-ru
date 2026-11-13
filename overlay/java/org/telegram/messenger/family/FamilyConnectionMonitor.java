@@ -24,6 +24,7 @@ public final class FamilyConnectionMonitor {
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private static final ScheduledExecutorService IO = Executors.newSingleThreadScheduledExecutor();
     private static volatile ConnectivityManager connectivity;
+    private static Context application;
     private static volatile SharedPreferences log;
     private static volatile int telegramState;
     private static boolean networkWasAvailable;
@@ -33,6 +34,7 @@ public final class FamilyConnectionMonitor {
     private FamilyConnectionMonitor() { }
 
     static void init(Context context) {
+        application = context.getApplicationContext();
         log = context.getSharedPreferences("fg_connection_diagnostics", Context.MODE_PRIVATE);
         connectivity = context.getSystemService(ConnectivityManager.class);
         networkWasAvailable = hasNetwork();
@@ -82,6 +84,9 @@ public final class FamilyConnectionMonitor {
         boolean online = hasNetwork();
         boolean gainedNetwork = online && !networkWasAvailable;
         networkWasAvailable = online;
+        if (gainedNetwork && FamilyStoreAccess.isConfigured(application)) {
+            FamilyStoreAccess.networkAvailable(application);
+        }
         FamilyAccess.reportTransportState(telegramState);
         String kind = networkKind();
         if (!kind.equals(lastNetwork)) {
@@ -99,6 +104,9 @@ public final class FamilyConnectionMonitor {
         if (telegramState != state) record("telegram " + state);
         telegramState = state;
         FamilyAccess.reportTransportState(state);
+        if (application != null && FamilyStoreAccess.isConfigured(application)) {
+            return FamilyStoreAccess.isActive(application) ? state : hasNetwork() ? 1 : 2;
+        }
         if (!FamilyAccess.previouslyApproved() || FamilyAccess.isAllowed()) return state;
         return hasNetwork() ? 1 : 2;
     }

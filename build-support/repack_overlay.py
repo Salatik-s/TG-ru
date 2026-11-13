@@ -4,7 +4,7 @@ from pathlib import Path
 from prepare_repack import ROOT,digest,within_work
 from verify_dex import verify_unique
 from dex_marker import share_marker
-parser=argparse.ArgumentParser();parser.add_argument('--base-sha256',required=True);parser.add_argument('--work',type=Path,default=ROOT/'work-preview7');args=parser.parse_args()
+parser=argparse.ArgumentParser();parser.add_argument('--base-sha256',required=True);parser.add_argument('--work',type=Path,default=ROOT/'work-preview7');parser.add_argument('--docs-jars',type=Path,default=ROOT.parent/'tools/docs-jars');args=parser.parse_args()
 work=within_work(args.work);base=work/'rebuilt-unsigned.apk'
 if not re.fullmatch('[a-f0-9]{64}',args.base_sha256) or digest(base)!=args.base_sha256:raise ValueError('Verified preview7 base hash required')
 report=json.loads((work/'report.json').read_text(encoding='utf-8'));attempt=1
@@ -19,7 +19,7 @@ if fingerprints!={str(p.resolve()):digest(p) for p in sources}:raise ValueError(
 jar=output/'overlay.jar'
 with zipfile.ZipFile(jar,'w',zipfile.ZIP_DEFLATED) as archive:
     for item in (classes/'org/telegram/messenger/family').rglob('*.class'):archive.write(item,item.relative_to(classes).as_posix())
-run(jdk/'java.exe','-cp',bt/'lib/d8.jar','com.android.tools.r8.D8','--min-api','24','--lib',android,'--output',dex,jar,*sorted((ROOT.parent/'tools/docs-jars').glob('*.jar')))
+run(jdk/'java.exe','-cp',bt/'lib/d8.jar','com.android.tools.r8.D8','--min-api','24','--lib',android,'--output',dex,jar,*sorted(args.docs_jars.glob('*.jar')))
 shared=sum(share_marker(item,base) for item in dex.glob('*.dex'))
 rebuilt=output/'repacked.apk'
 with zipfile.ZipFile(base) as before,zipfile.ZipFile(rebuilt,'w') as after:

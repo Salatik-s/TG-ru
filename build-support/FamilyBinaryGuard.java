@@ -42,20 +42,15 @@ public final class FamilyBinaryGuard implements Application.ActivityLifecycleCal
     public static boolean canShowChats() {
         FamilyBinaryGuard guard = instance;
         if (guard != null && FamilyStoreAccess.isConfigured(guard.application)) {
-            return FamilyStoreAccess.isActive(guard.application) || hasStoreChatCache(guard.application);
+            return FamilyStoreAccess.isActive(guard.application) || FamilyStoreAccess.hasOfflineAccess(guard.application);
         }
         return FamilyAccess.isAllowed() || FamilyAccess.hasCachedAccount();
-    }
-
-    private static boolean hasStoreChatCache(Context context) {
-        return FamilyAccess.hasCachedTelegramAccount(context)
-                && FamilyStoreAccess.accessUntil(context) > System.currentTimeMillis() / 1000;
     }
 
     private static boolean canShow(Activity activity) {
         if (FamilyStoreAccess.isConfigured(activity)) {
             return activity instanceof FamilyStoreGateActivity || FamilyStoreAccess.isActive(activity)
-                    || activity.getClass().getName().equals(LAUNCHER) && hasStoreChatCache(activity);
+                    || activity.getClass().getName().equals(LAUNCHER) && FamilyStoreAccess.hasOfflineAccess(activity);
         }
         if (FamilyAccess.isAllowed()) return true;
         String type = activity.getClass().getName();
@@ -76,6 +71,7 @@ public final class FamilyBinaryGuard implements Application.ActivityLifecycleCal
         boolean store = FamilyStoreAccess.isConfigured(activity);
         if (activity instanceof FamilyStoreGateActivity || !store && familyScreen(activity)
                 || activity.isFinishing() || redirecting.contains(activity)) return;
+        if (store && canShow(activity)) return;
         redirecting.add(activity);
         Class<? extends Activity> destination = store ? FamilyStoreGateActivity.class : FamilyGateActivity.class;
         Intent intent = new Intent(activity, destination);

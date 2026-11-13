@@ -10,6 +10,8 @@
 
 ## Инструменты
 
+Для Store preview25 используйте подписанный preview24 с SHA-256 `e00e29122c085fe511c2861ce326750696f47e61a6caeb34c0f799c1d80ee5d7`. Декодируйте его через Apktool с `--no-src` в `build-support/work-store-10026/decoded`. Запустите `prepare_store_qa_preview.py` с путями к базовому APK и рабочему каталогу. Соберите `rebuilt-unsigned.apk` через Apktool, затем передайте его SHA-256 и рабочий каталог в `repack_overlay.py`. Параметр `--docs-jars` задаёт путь к зависимостям просмотрщика, если они лежат в другом рабочем каталоге. Подпишите `SAA-UNSIGNED.apk` через `Sign.ps1`. Сервер Store публикует метаданные для кнопки «Проверить обновления» по `/api/store/release`.
+
 Использованы Windows PowerShell, Python 3, JDK с javac 17, Android SDK Platform 35 / Build Tools 37.0.0, D8, AAPT2, zipalign, apksigner, Apktool 3.0.3, Go и Android NDK для нативных библиотек. Потребуются инструменты и зависимости, указанные в README каталогов `native`, `tunnel`, `calls`, `build-support`.
 
 Исходные контрольные суммы находятся в `upstream-release.json`, lock-файлах и отчётах сборки. Приватный ключ подписи не включён. Для обновления уже установленного TG-ru требуется тот же ключ; новая подпись не является совместимым обновлением.

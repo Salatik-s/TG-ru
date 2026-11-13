@@ -21,6 +21,13 @@ public final class FamilyTelegramPreset {
             editor.putBoolean("HideStoriesFromHeader", false);
             editor.putBoolean("TgRuStoriesHeaderRestored", true);
         }
+        if (!prefs.getBoolean("TgRuClassicComposerRestored", false)) {
+            editor.putBoolean("UseChatAttachEnterMenu", false);
+            editor.putBoolean("OEChatsKeepAttachButton", false);
+            editor.putBoolean("ShowSendAsUnderMessageHint", false);
+            editor.putBoolean("HideBotButtonInInputField", false);
+            editor.putBoolean("TgRuClassicComposerRestored", true);
+        }
         String[] off = {
             "OEAppearanceSquareFab", "OEAppearanceSenderMiniAvatars", "OEAppearanceGooeyAvatarAnimation",
             "OEAppearanceGlassMessageMenu", "OEAppearanceNewLoadingStyle", "OEAppearanceNewChatHeaderStyle",

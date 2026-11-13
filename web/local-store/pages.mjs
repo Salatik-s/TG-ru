@@ -1,7 +1,12 @@
 import { readFileSync } from 'node:fs';
+import { previewBrandIconUrl, previewHeader } from './preview-header.mjs';
+import { previewFooter } from './preview-footer.mjs';
 
 const staticFiles = new Map([
+  [previewBrandIconUrl, ['image/png', readFileSync(new URL('./tg-ru-mark.png', import.meta.url))]],
   ['/store.css', ['text/css; charset=utf-8', readFileSync(new URL('./store.css', import.meta.url))]],
+  ['/preview-cabinet.css', ['text/css; charset=utf-8', readFileSync(new URL('./preview-cabinet.css', import.meta.url))]],
+  ['/preview-header.css', ['text/css; charset=utf-8', readFileSync(new URL('./preview-header.css', import.meta.url))]],
   ['/fonts/inter-cyrillic.woff2', ['font/woff2', readFileSync(new URL('./inter-cyrillic.woff2', import.meta.url))]],
   ['/fonts/inter-latin.woff2', ['font/woff2', readFileSync(new URL('./inter-latin.woff2', import.meta.url))]],
   ['/store.mjs', ['text/javascript; charset=utf-8', readFileSync(new URL('./store.mjs', import.meta.url))]],
@@ -19,7 +24,6 @@ const forms = new Map([
   ['/form/trial', 'trial'], ['/form/devices/revoke', 'devices/revoke'],
 ]);
 const supportLink = 'https://t.me/prince_skazki';
-const favicon = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAACwElEQVR4nMRXX0hTYRT/3bvhdWJjYDUIJ9aMyDIKIeNaZGQwKJRYe4o99NBDKBX0UAwKepEIAutlDz4ESkEsiVbEoKKVNCoITXIQ+BCsJtKEmJBsbd6+8+1Oh3mvc3O7Pxjf7vfn/s4595xz78+MVXBpROlhg0cBOgUBDigwoxQIyCgKYgLwnl0F7nqF4P9bCnDxgdIuLuIOIz6KCoCRvV0UceXeWeFzwVwO3GsBoyV7W7wVGcbhzkeDG0CeCwo+VJy8wAhFwCGKhEjXFPaqkRMYF+ckW9SEewpj0Etee2AcPCKVGgwCcYu8zg0CcZurmnwrQckIg6HrfXY2gthMUmPVCttuGTZJ3ZuI4PuXMOIJwObsgqNtea1kA/58HcCr4JTG6h50XH/OSJKIP3HjRXh6eSkyhI9oQWv/KOSdVj0K3gcUzdVUEgvpFP8bf3wQbyaAZu8ndO6iGQk1dVZkJy5geDgEWFyQ+3zYbqtFKnoDwYchpOHCsdt+OHUioZ+AkhUW9XCNutNUuwWWTfkNMURfMnJWSAf6/GhV68nS4cfJv9cQ/QlkfrGJxlINWBPTSMzQKGPrimJuOHwLR4q4w8aUoL0R+aDMvz6FRwV5Y+t5hzPHtVtN2WXIPZidwlwuVVC314fuc37I7TlSk0n/fJkGyNi2j8YQxsdyVWCyy2jeL0NKxUClam/Sb7RlPgIJzl4fJicHMPfsBO6Pu9DSJGE+GkL8N1t29KNtByppAMPm8zh904Gxoav49iPEfjRpRYM8iG63ayk3tKDfB9aLbArpBVay9UW0QBUb+yIyseZUv64TLAnpI9EoMG6RvtthEIhbVEWDISBu6gMBGIcA1wWXR5RwpdSQFkglDXqFLt4JSS5VNRkZF+eE2oq5VmNyqSpGqNIsrw+X3gWk1UguUWhQIdC9iaNQJQurbaymPP8HAAD//56cWNAAAAAGSURBVAMAsRzb6b2KXo0AAAAASUVORK5CYII=';
 
 const paths = {
   phone: '<rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 17h2"/>',
@@ -72,46 +76,26 @@ function errorNotice(error) {
   return `<p class="notice error" role="alert" tabindex="-1">${icon('info')}${escapeHtml(errorMessages[error] ?? 'Не удалось выполнить действие. Проверьте данные и повторите.')}</p>`;
 }
 
-function layout(title, content, { session, route, marketing = false, ownerView = false } = {}) {
-  const account = session?.account;
-  const navLink = (href, name) => `<a href="${href}"${route === href ? ' aria-current="page"' : ''}>${name}</a>`;
-  const nav = marketing || !account
-    ? '<a href="/#how">Как это работает</a>' + navLink('/visibility', 'Что мы видим') + '<a href="/#price">Цена</a>'
-    : navLink('/cabinet', 'Обзор') + navLink('/devices', 'Устройства') + navLink('/downloads', 'Загрузки') + navLink('/help', 'Помощь');
-  const sessionLinks = account
-    ? (marketing ? action('/cabinet', 'Кабинет', 'primary') : `<form method="post" action="/form/logout">${csrf(session)}${formButton('Выйти', 'ghost')}</form>`)
-    : `${route === '/login' ? '' : action('/login', 'Войти', 'ghost')}${action('/register', 'Создать аккаунт', 'primary')}`;
+function layout(title, content, { session, route, ownerView = false } = {}) {
   return `<!doctype html>
 <html lang="ru">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="TG-ru — независимый Android-клиент Telegram с подпиской на доступ к шлюзу.">
-  <meta name="color-scheme" content="dark">
+  <meta name="description" content="TG-ru — независимый клиент Telegram со своим VPN-шлюзом.">
+  <meta name="color-scheme" content="light">
   <title>${escapeHtml(title)} · TG-ru</title>
-  <link rel="icon" type="image/png" sizes="32x32" href="${favicon}">
+  <link rel="icon" type="image/png" sizes="736x736" href="${previewBrandIconUrl}">
   ${ownerView ? '' : '<script src="/store.mjs"></script>'}
   <link rel="stylesheet" href="/store.css">
+  <link rel="stylesheet" href="/preview-cabinet.css">
+  <link rel="stylesheet" href="/preview-header.css">
 </head>
 <body>
   <a class="skip" href="#content">Перейти к содержимому</a>
-  <header class="site-header">
-    <div class="wrap topbar">
-      <a class="brand" href="/" aria-label="TG-ru, главная"><span class="brand-icon" aria-hidden="true">TG</span>TG-ru</a>
-      ${ownerView ? '' : `<nav aria-label="Основная навигация">${nav}</nav><div class="session-links">${sessionLinks}</div>`}
-    </div>
-  </header>
+  ${previewHeader({ session, route, ownerView })}
   <main id="content" tabindex="-1">${content}</main>
-  <footer class="site-footer">
-    <div class="wrap footer-inner">
-      <div class="footer-main">
-        <p>${strings.site.disclaimer}</p>
-      </div>
-      <nav aria-label="Информация о сервисе">
-        <a href="/terms">Оферта</a><a href="/privacy">Конфиденциальность</a><a href="/visibility">Что мы видим</a><a href="/refunds">Возвраты</a><a href="/compatibility">Политика совместимости</a>
-      </nav>
-    </div>
-  </footer>
+  ${previewFooter}
 </body>
 </html>`;
 }
@@ -300,14 +284,14 @@ function status(session, now, access) {
     return `<p class="access-label">${access.label}</p><h2 class="access-title">Действует до ${calendarDate.format(deadline)}</h2>
       ${access.trial ? `<progress class="access-progress" value="${remaining}" max="${trialDuration}" aria-label="Осталось времени пробного доступа"></progress>` : ''}
       <p>${detail} Окончание в ${clockTime.format(deadline)} (МСК).</p>
-      <div class="actions">${session.account.plan === 'pro' ? action('/checkout?plan=pro', 'Продлить на 90 дней', 'primary') : action('/checkout', 'Продлить на 30 дней', 'primary')}${action('/#price', 'Сменить тариф')}</div>`;
+      <div class="actions">${access.trial ? action('/#price', 'Выбрать тариф', 'primary') : `${session.account.plan === 'pro' ? action('/checkout?plan=pro', 'Продлить на 90 дней', 'primary') : action('/checkout', 'Продлить на 30 дней', 'primary')}${action('/#price', 'Сменить тариф')}`}</div>`;
   }
   if (access.trialAvailable) {
     return `<h2 class="access-title">Начните с 5 часов бесплатно</h2><p>Пробный период начнётся сразу после нажатия. При активации приложения устройство появится в кабинете. <a href="/terms#trial-conditions">Условия пробы</a></p>
       <div class="actions"><form method="post" action="/form/trial">${csrf(session)}${formButton('Попробовать 5 часов бесплатно')}</form>
       ${action('/checkout', 'Получить доступ')}</div>`;
   }
-  return `<h2 class="access-title">Срок доступа истёк</h2>
+  return `<h2 class="access-title">${access.until ? 'Срок доступа истёк' : 'Подключите доступ'}</h2>
     ${access.until ? `<p>Доступ закончился ${formatDate(access.until)} (МСК).</p>` : ''}
     ${action('/checkout', 'Получить доступ', 'primary')}`;
 }
@@ -326,7 +310,7 @@ function cabinet(session, error, now) {
   return layout('Кабинет', `
 <section class="wrap dashboard dashboard-overview">
   <div class="page-heading"><div><h1>Кабинет</h1><p>Вы вошли как <strong>${escapeHtml(login)}</strong></p></div>
-    ${access.active ? badge(access.label, 'success') : access.trialAvailable ? '' : badge('Доступ закончился', 'warning')}</div>
+    ${access.active ? badge(access.label, 'success') : access.until ? badge('Доступ закончился', 'warning') : ''}</div>
   ${errorNotice(error)}
   <div class="dashboard-grid">
     <div class="dashboard-stack">
@@ -335,17 +319,17 @@ function cabinet(session, error, now) {
       </section>
       <section class="dashboard-card">
         <div class="dashboard-card-heading"><h2>Устройства</h2><p>Подключено ${devices.length} из ${device_limit}</p></div>
-        ${devices.length ? `<ul class="device-overview-list">${devices.map((device) => `<li>${deviceSummary(device)}${revokeDevice(device, session)}</li>`).join('')}</ul>` : '<p>Устройств пока нет. Войдите в TG-ru на Android, чтобы подключить первое.</p>'}
+        ${devices.length ? `<ul class="device-overview-list">${devices.map((device) => `<li>${deviceSummary(device)}</li>`).join('')}</ul>` : '<p>Первое устройство появится здесь после входа в приложение.</p>'}
+        ${action('/devices', 'Управление устройствами')}
       </section>
     </div>
     <div class="dashboard-stack dashboard-aside">
       <section class="dashboard-card"><h2>Приложение</h2><p>TG-ru для Android. После установки введите логин и пароль на первом экране.</p>
         ${action('/downloads', 'Скачать APK', 'primary')}<a class="download-hash-link" href="/downloads#download-checksum">Как проверить хеш</a></section>
-      <section class="dashboard-card"><h2>Помощь</h2><p>Не получается подключиться или продлить доступ? Напишите в поддержку.</p>
-        ${action('/help', 'Помощь с доступом')}</section>
+      <section class="dashboard-card"><h2>Помощь</h2><p>Вход, подключение устройства и продление доступа.</p>
+        ${action('/help', 'Решить проблему')}</section>
     </div>
   </div>
-  <section class="dashboard-card payments-card"><h2>Платежи</h2><p>История платежей появится после подключения онлайн-оплаты.</p></section>
 </section>`, { session, route: '/cabinet' });
 }
 
@@ -353,12 +337,11 @@ function devices(session, error) {
   const { devices: items, device_limit } = session.account;
   return layout('Устройства', `
 <section class="wrap dashboard">
-  <div class="page-heading"><h1>Устройства</h1><p>Подключено ${items.length} из ${device_limit}</p></div>
+  <div class="page-heading account-heading"><div><h1>Устройства</h1><p>Телефоны с доступом к шлюзу TG-ru.</p></div><span class="account-count">${items.length} из ${device_limit} подключено</span></div>
   ${errorNotice(error)}
   ${items.length >= device_limit ? `<p class="notice" role="status">${icon('info')}Все места заняты. Отвяжите устройство, чтобы подключить другое.</p>` : ''}
   ${items.length ? `<ul class="device-list">${items.map((device) => `<li>${deviceSummary(device)}${revokeDevice(device, session)}</li>`).join('')}</ul>` : `
-  <div class="empty"><span class="route-icon">${icon('phone')}</span><h2>Устройств пока нет</h2><p>Скачайте приложение и введите логин и пароль TG-ru.</p>${action('/downloads', 'К загрузкам', 'primary')}</div>`}
-  <p class="subtle"><a href="/cabinet">К обзору</a></p>
+  <div class="dashboard-card account-empty"><span class="route-icon">${icon('phone')}</span><h2>Устройств пока нет</h2><p>Откройте TG-ru на телефоне и введите логин и пароль от кабинета. После подключения телефон появится в этом списке.</p>${action('/downloads', 'Установить TG-ru', 'primary')}</div>`}
 </section>`, { session, route: '/devices' });
 }
 
@@ -375,8 +358,6 @@ function checkout(session, pro) {
 }
 
 const documents = {
-  '/downloads': ['Загрузки', '<h2>Подключение устройства</h2><ol><li>Создайте аккаунт TG-ru и запустите пятичасовую пробу или получите доступ через поддержку.</li><li>Откройте приложение и введите логин и пароль TG-ru.</li><li>Войдите в свой аккаунт Telegram на следующем экране.</li></ol><p>При установке Android может попросить разрешить установку приложений из браузера.</p>'],
-  '/help': ['Помощь', `<h2>Как получить доступ</h2><p>Онлайн-оплата пока недоступна. Напишите в поддержку, чтобы подключить START или PRO.</p><p><a href="${supportLink}">Написать в поддержку</a></p><h2>Телефон не подключается</h2><p>Откройте кабинет и проверьте срок доступа. Если все места заняты, отвяжите телефон, которым больше не пользуетесь.</p><p><a href="/cabinet">Открыть кабинет</a></p>`],
   '/visibility': ['Что мы видим, а чего нет', `
 <p>Кабинет управляет доступом, шлюз пересылает трафик, а Telegram обслуживает аккаунт и чаты.</p>
 ${visibilitySummary()}
@@ -405,13 +386,13 @@ ${visibilitySummary()}
   '/privacy': ['Политика конфиденциальности', `
 <p>Политика описывает обработку данных в кабинете и шлюзе TG-ru. Обращения по данным принимает <a href="${supportLink}">поддержка TG-ru</a>.</p>
 <h2>Какие данные обрабатываем и зачем</h2>
-<ul><li><strong>Аккаунт.</strong> Логин, дата регистрации, хеши пароля и кода восстановления нужны для входа, восстановления доступа и защиты аккаунта.</li>
-<li><strong>Доступ и устройства.</strong> Сроки пробы и подписки, сведения о ручной выдаче, название и открытый ключ установки, даты привязки и отвязки нужны для проверки права на подключение.</li>
+<ul><li><strong>Аккаунт.</strong> Для регистрации достаточно логина и пароля TG-ru. Мы храним логин, дату регистрации, хеши пароля и кода восстановления. Кабинет не запрашивает имя, почту или номер телефона.</li>
+<li><strong>Доступ и устройства.</strong> У аккаунтов START и PRO хранятся тариф и срок доступа, сведения о ручной выдаче, идентификатор, название и открытый ключ установки, даты привязки и отвязки. Эти сведения нужны для проверки доступа и лимита устройств.</li>
 <li><strong>Сессии и технические сведения.</strong> Cookie поддерживает вход в кабинет. При подключении обрабатываются IP-адрес и сетевые метаданные. Технические события используются для работы сервиса, диагностики и защиты от злоупотреблений.</li></ul>
 <h2>Хранение и защита</h2>
 <p>Пароли и коды восстановления хранятся в виде хешей. Сессия вошедшего пользователя действует до 14 дней и завершается при выходе. Сведения об аккаунте и устройствах хранятся, пока нужны для предоставления и защиты доступа. Одноразовая ссылка на APK привязана к сессии и действует до 15 минут.</p>
 <h2>Telegram, Platega и другие получатели</h2>
-<p>Telegram обслуживает переписку и вход в мессенджер по <a href="https://telegram.org/privacy">собственной политике конфиденциальности</a>. Шлюз TG-ru пересылает зашифрованный трафик. Подробности приведены на странице <a href="/visibility">«Что мы видим»</a>.</p>
+<p>Telegram обслуживает переписку и вход в мессенджер по <a href="https://telegram.org/privacy">собственной политике конфиденциальности</a>. Шлюз TG-ru пересылает зашифрованный трафик. База кабинета не содержит переписку, контакты и данные для входа в Telegram. Подробности приведены на странице <a href="/visibility">«Что мы видим»</a>.</p>
 <p>Оплата через Platega пока отключена. После подключения платёжная форма будет обслуживаться на стороне провайдера по <a href="https://platega.io/ru/privacy-policy">политике Platega</a>. Данные банковской карты в кабинете TG-ru вводить не потребуется.</p>
 <h2>Как обратиться по своим данным</h2>
 <p>Можно запросить сведения об обработке, исправление, прекращение обработки или удаление данных в предусмотренных законом случаях. Укажите логин TG-ru и суть запроса. Поддержка может попросить подтвердить владение аккаунтом безопасным способом. Пароль, код восстановления, код Telegram и банковские данные присылать не нужно.</p>`],
@@ -433,18 +414,68 @@ ${visibilitySummary()}
 <p>TG-ru использует Telegram API и зависит от работы платформы, маршрута и сети пользователя. При выпуске обновлений ориентируемся на <a href="https://core.telegram.org/api/terms">правила Telegram для сторонних клиентов</a>. Доступ к шлюзу TG-ru и Telegram Premium оформляются отдельно.</p>`],
 };
 
-function documentPage(route, session, release) {
+function helpPage(session) {
+  return layout('Помощь', `
+<section class="wrap dashboard account-page">
+  <div class="page-heading"><h1>Помощь</h1><p>Выберите, на каком шаге возникла проблема.</p></div>
+  <div class="account-split">
+    <section class="dashboard-card">
+      <h2>Что не получается?</h2>
+      <div class="account-faq">
+        <details><summary>Не могу войти в TG-ru</summary><p>На первом экране приложения нужен логин и пароль кабинета TG-ru. Номер телефона и код Telegram вводятся на следующем экране.</p><a href="/recover">Восстановить пароль TG-ru</a></details>
+        <details><summary>Устройство не подключается</summary><p>Проверьте срок доступа. Если все места заняты, отвяжите устройство, которым больше не пользуетесь, и снова войдите в приложение.</p><a href="/devices">Открыть список устройств</a></details>
+        <details><summary>APK не устанавливается</summary><p>Проверьте версию Android. Если система попросит разрешить установку, выдайте разрешение браузеру или файловому менеджеру, из которого открыли файл.</p><a href="/downloads">Открыть загрузки</a></details>
+        <details><summary>Как подключить или продлить START и PRO?</summary><p>Онлайн-оплата пока недоступна. Выберите тариф и напишите в поддержку для выдачи доступа.</p><a href="/#price">Посмотреть тарифы</a></details>
+      </div>
+    </section>
+    <aside class="dashboard-card account-support">
+      <span class="route-icon">${icon('chat')}</span><h2>Написать в поддержку</h2>
+      <p>Укажите логин TG-ru, модель телефона, версию приложения и шаг, на котором возникла ошибка. На скриншоте скройте личные данные.</p>
+      <p>Пароль, код восстановления и код Telegram никому не передавайте.</p>
+      ${action(supportLink, 'Открыть Telegram', 'primary')}
+    </aside>
+  </div>
+</section>`, { session, route: '/help' });
+}
+
+function downloadsPage(session, release) {
+  const app = release
+    ? `<dl class="release-meta">
+        <div><dt>Версия</dt><dd>${escapeHtml(release.version_name)}</dd></div>
+        <div><dt>Требования</dt><dd>Android ${release.min_sdk === 24 ? '7.0 и новее' : 'API ' + release.min_sdk}</dd></div>
+        <div><dt>Размер</dt><dd>${Math.round(release.bytes / 1024 / 1024)} МиБ</dd></div>
+      </dl>
+      <p>Опубликовано ${formatDate(Date.parse(release.released_at) / 1000)} по Москве.</p>
+      <form method="post" action="/form/download" data-download>${csrf(session)}${formButton('Скачать TG-ru.apk')}</form>
+      <div class="account-faq">
+        <details id="download-checksum"><summary>Проверить файл по SHA-256</summary><p>Сравните SHA-256 скачанного APK с этой суммой.</p><code class="checksum-value">${escapeHtml(release.sha256)}</code></details>
+        <details><summary>У меня уже есть версия с приглашением</summary><p>Если установите этот APK поверх неё, приложение перейдёт на вход через кабинет TG-ru. Пока старая версия установлена, она подключается через прежний шлюз.</p></details>
+      </div>`
+    : '<p>Сборка пока недоступна для скачивания.</p>';
+  return layout('Загрузки', `
+<section class="wrap dashboard account-page">
+  <div class="page-heading"><h1>Загрузки</h1><p>Установите TG-ru на телефон или обновите приложение.</p></div>
+  <div class="account-split">
+    <section class="dashboard-card release-card">
+      <div class="release-heading"><span class="route-icon">${icon('phone')}</span><h2>TG-ru для Android</h2></div>
+      ${app}
+    </section>
+    <section class="dashboard-card">
+      <h2>Как установить</h2>
+      <ol class="install-steps">
+        <li><strong>Откройте скачанный APK.</strong><p>Подтвердите установку в Android. Если система попросит разрешение, выдайте его браузеру или файловому менеджеру, из которого открыли файл.</p></li>
+        <li><strong>Войдите в TG-ru.</strong><p>Введите логин и пароль кабинета. Для первого подключения нужен действующий доступ.</p></li>
+        <li><strong>Войдите в Telegram.</strong><p>На следующем экране введите номер телефона или откройте уже добавленный аккаунт.</p></li>
+      </ol>
+      <a href="/help">Помощь с установкой</a>
+    </section>
+  </div>
+</section>`, { session, route: '/downloads' });
+}
+
+function documentPage(route, session) {
   const [title, body] = documents[route];
-  const downloads = route === '/downloads' ? `<h2>TG-ru для Android</h2>${
-    release
-      ? `<p>Версия ${escapeHtml(release.version_name)} · Android ${release.min_sdk === 24 ? '7.0+' : 'API ' + release.min_sdk} · ${Math.round(release.bytes / 1024 / 1024)} МиБ</p>
-<p>Опубликовано ${formatDate(Date.parse(release.released_at) / 1000)} по Москве.</p>
-<div class="actions"><form method="post" action="/form/download">${csrf(session)}${formButton('Скачать TG-ru.apk')}</form></div>
-<details id="download-checksum"><summary>Как проверить хеш SHA-256</summary><p>Сравните SHA-256 скачанного APK с этой суммой.</p><p class="break-word"><code>${escapeHtml(release.sha256)}</code></p></details>
-<p>Установка поверх версии с приглашением переключит приложение на вход через кабинет TG-ru. Уже установленная версия с приглашением продолжит работать через свой шлюз.</p>`
-      : '<p>Публичная загрузка пока не открыта.</p>'
-  }` : '';
-  return layout(title, `<article class="wrap prose"><h1>${title}</h1>${downloads}${body}</article>`, { session, route });
+  return layout(title, `<article class="wrap prose"><h1>${title}</h1>${body}</article>`, { session, route });
 }
 
 function redirect(response, location) {
@@ -652,6 +683,8 @@ export async function handleStorePages(request, response, { getSession, submit, 
   else if (route === '/cabinet') html(cabinet(session, '', now));
   else if (route === '/devices') html(devices(session));
   else if (route === '/checkout') html(checkout(session, url.searchParams.get('plan') === 'pro'));
-  else html(documentPage(route, session, release));
+  else if (route === '/help') html(helpPage(session));
+  else if (route === '/downloads') html(downloadsPage(session, release));
+  else html(documentPage(route, session));
   return true;
 }

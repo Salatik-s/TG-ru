@@ -46,6 +46,7 @@ public final class FamilyAppUpdate {
     private static final ExecutorService WORKER = Executors.newSingleThreadExecutor();
     private static final AtomicBoolean CHECKING = new AtomicBoolean();
     private static final AtomicBoolean DOWNLOADING = new AtomicBoolean();
+    private static final AtomicBoolean CHECKING_STORE = new AtomicBoolean();
     private static volatile Release available;
     private static volatile long lastChecked;
     private static volatile long lastAttempt;
@@ -94,7 +95,66 @@ public final class FamilyAppUpdate {
         });
     }
 
-    public static void open(Activity activity) { fetch(activity, null, true); }
+    public static void open(Activity activity) {
+        if (FamilyStoreAccess.isConfigured(activity)) checkStore(activity);
+        else fetch(activity, null, true);
+    }
+
+    private static void checkStore(Activity activity) {
+        if (!CHECKING_STORE.compareAndSet(false, true)) return;
+        toast(activity, "Проверяем обновления…");
+        String origin = FamilyStoreAccess.origin();
+        WORKER.execute(() -> {
+            String status = "Не удалось проверить обновления. Проверьте подключение и попробуйте ещё раз.";
+            boolean offerDownload = false;
+            try {
+                HttpURLConnection connection = connect(origin + "/api/store/release");
+                try {
+                    int code = connection.getResponseCode();
+                    if (code == 404) {
+                        status = "Сервер пока не сообщает версию. Актуальную сборку можно проверить в кабинете.";
+                        offerDownload = true;
+                    } else if (code == 200) {
+                        JSONObject metadata = new JSONObject(new String(
+                                readBounded(connection.getInputStream(), 4096), StandardCharsets.UTF_8));
+                        long version = metadata.getLong("version_code");
+                        int minSdk = metadata.getInt("min_sdk");
+                        String name = metadata.getString("version_name");
+                        if (!metadata.getBoolean("ok") || version < 1 || version > Integer.MAX_VALUE
+                                || minSdk < 24 || minSdk > 100 || !name.matches("[A-Za-z0-9._-]{1,64}")) {
+                            throw new UpdateFailure("Invalid Store version");
+                        }
+                        if (version <= installedVersion(activity)) {
+                            status = "У вас актуальная версия TG-ru.";
+                        } else if (minSdk > Build.VERSION.SDK_INT) {
+                            status = "Для новой версии TG-ru нужна более новая версия Android.";
+                        } else {
+                            status = "Доступна версия " + name + ". Скачайте её в кабинете TG-ru.";
+                            offerDownload = true;
+                        }
+                    }
+                } finally { connection.disconnect(); }
+            } catch (Exception ignored) {
+                // A manual check always returns feedback, including on a failed connection.
+            } finally { CHECKING_STORE.set(false); }
+            String message = status;
+            boolean download = offerDownload;
+            MAIN.post(() -> {
+                if (!alive(activity)) return;
+                AlertDialog.Builder dialog = new AlertDialog.Builder(activity)
+                        .setTitle("Обновления TG-ru").setMessage(message)
+                        .setNegativeButton(download ? "Позже" : "Закрыть", null);
+                if (download) dialog.setPositiveButton("Открыть загрузки", (ignored, which) -> {
+                    try {
+                        activity.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(origin + "/downloads")));
+                    } catch (RuntimeException error) {
+                        toast(activity, "Откройте раздел «Загрузки» на сайте TG-ru.");
+                    }
+                });
+                dialog.show();
+            });
+        });
+    }
 
     private static void fetch(Activity activity, Runnable changed, boolean interactive) {
         if (FamilyStoreAccess.isConfigured(activity)) return;

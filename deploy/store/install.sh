@@ -214,7 +214,11 @@ systemctl reload nginx
 
 published=0
 for attempt in {1..10}; do
-    if homepage=$(https -fsS "https://$domain/") && [[ $homepage == *'<link rel="stylesheet" href="/store.css">'* ]] &&
+    if homepage=$(https -fsS "https://$domain/") && [[ $homepage == *'<link rel="stylesheet" href="/preview-home.css">'* ]] &&
+       https -fsS "https://$domain/preview-home.css" -o /dev/null &&
+       https -fsS "https://$domain/tg-ru-mark.png" -o /dev/null &&
+       metadata=$(https -fsS "https://$domain/api/store/release") &&
+       python3 -c 'import json, sys; actual = json.loads(sys.argv[1]); expected = json.load(open(sys.argv[2])); assert actual["ok"] is True and all(actual[key] == expected[key] for key in ("version_code", "version_name", "min_sdk"))' "$metadata" "$release/store-release.json" &&
        session=$(https -fsS "https://$domain/api/store/session") && [[ $session == *'"ok":true'* ]] &&
        [[ $(https -sS -o /dev/null -w '%{http_code}' "https://$domain/_tg_ru_store_apk") == 404 ]] &&
        [[ $(https -sS -o /dev/null -w '%{http_code}' "https://$domain/downloads") == 303 ]] &&
