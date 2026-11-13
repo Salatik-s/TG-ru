@@ -109,8 +109,8 @@ function keyFromDer(der) {
   return key;
 }
 
-function validProof(key, nonce, signature) {
-  return verify('sha256', Buffer.from(PROOF_PREFIX + nonce), key, signature);
+function validProof(key, nonce, signature, prefix = PROOF_PREFIX) {
+  return verify('sha256', Buffer.from(prefix + nonce), key, signature);
 }
 
 function passwordHash(password, nonce) {
@@ -607,10 +607,10 @@ export function createStore({
     return row;
   }
 
-  function consumeProof(rawToken, action, proofKey, signature, processProof) {
+  function consumeProof(rawToken, action, proofKey, signature, processProof, prefix) {
     const outcome = inTransaction(() => {
       const challenge = readChallenge(rawToken, action);
-      require(validProof(proofKey(challenge), challenge.nonce, signature), 403, 'invalid_proof');
+      require(validProof(proofKey(challenge), challenge.nonce, signature, prefix), 403, 'invalid_proof');
       db.prepare('DELETE FROM challenges WHERE token_hash=?').run(challenge.token_hash);
       try {
         return { value: processProof(challenge) };
@@ -653,7 +653,7 @@ export function createStore({
     });
   }
 
-  function finishRenewal(data) {
+  function finishRenewal(data, prefix) {
     const signature = base64(data.signature, 100);
     let device;
     return consumeProof(data.token, 'renew', (challenge) => {
@@ -666,7 +666,7 @@ export function createStore({
       const time = now();
       const accessUntil = checkAccess(account, 'subscription_expired', time);
       return deviceLease(account, device.id, accessUntil, proExpiresAt(db, device.account_id), time);
-    });
+    }, prefix);
   }
 
   function deviceLease(account, id, accessUntil, proUntil, time) {
@@ -693,6 +693,9 @@ export function createStore({
       }
       case 'device/renew':
         return transportLease(finishRenewal(data));
+      case 'device/update':
+        require(Number.isSafeInteger(data.version_code) && data.version_code > 0, 400, 'bad_request');
+        return finishRenewal(data, 'tg-ru-store-update\n' + data.version_code + '\n');
       default:
         throw new StoreError(404, 'not_found');
     }

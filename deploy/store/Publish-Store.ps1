@@ -9,7 +9,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
-if (-not $ApkPath) { $ApkPath = Join-Path $repo 'release/TG-ru-preview25-store-public.apk' }
+if (-not $ApkPath) { $ApkPath = Join-Path $repo 'release/TG-ru-preview26-store-public.apk' }
 $sdk = Join-Path $env:LOCALAPPDATA 'Android/Sdk/build-tools/37.0.0'
 $java = Join-Path $env:LOCALAPPDATA 'Programs/Android Studio/jbr/bin/java.exe'
 $aapt = Join-Path $sdk 'aapt.exe'

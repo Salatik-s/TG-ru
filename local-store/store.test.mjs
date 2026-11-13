@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHmac, generateKeyPairSync, randomBytes, sign } from 'node:crypto';
-import { mkdtempSync, readFileSync, rmSync, rmdirSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, rmdirSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -28,8 +28,46 @@ function installation() {
       token: challenge.token,
       signature: sign('sha256', Buffer.from('tg-ru-store-local\n' + challenge.challenge), privateKey).toString('base64'),
     }),
+    update: (challenge, version_code) => ({
+      token: challenge.token, version_code,
+      signature: sign('sha256', Buffer.from('tg-ru-store-update\n' + version_code + '\n' + challenge.challenge), privateKey).toString('base64'),
+    }),
   };
 }
+
+test('a linked device downloads the current release once without a browser session', async (t) => {
+  const version = 10027;
+  const apk = Buffer.from('test apk payload');
+  const directory = mkdtempSync(join(tmpdir(), 'store-update-'));
+  const path = join(directory, 'test.apk');
+  writeFileSync(path, apk);
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const f = await fixture(t, { localApk: path, release: { version_code: version, bytes: apk.length } });
+  const browser = f.browser();
+  const { login } = await f.signup(browser);
+  await browser.request('trial', {});
+  const device = installation();
+  const anonymous = f.browser();
+  const issued = await anonymous.request('activation-token', login);
+  const activated = await anonymous.request('activate', device.activation(issued.body));
+  assert.equal(activated.status, 200);
+  const { device_id } = activated.body;
+  const challenge = (await anonymous.request('device/challenge', { device_id })).body;
+  assert.equal((await anonymous.request('device/update', { ...device.renewal(challenge), version_code: version })).status, 403);
+  assert.equal((await anonymous.request('device/update', device.update(challenge, version + 1))).status, 409);
+  const authorized = await anonymous.request('device/update', device.update(challenge, version));
+  assert.equal(authorized.status, 200);
+  assert.equal((await anonymous.request('device/update', device.update(challenge, version))).status, 400);
+  const download = () => fetch(f.base + '/api/store/device/update', {
+    headers: { Authorization: 'Bearer ' + authorized.body.ticket },
+  });
+  const response = await download();
+  assert.deepEqual(Buffer.from(await response.arrayBuffer()), apk);
+  assert.equal((await download()).status, 403);
+  await browser.request('devices/revoke', { device_id });
+  const revoked = (await anonymous.request('device/challenge', { device_id })).body;
+  assert.equal((await anonymous.request('device/update', device.update(revoked, version))).status, 403);
+});
 
 async function fixture(t, options = {}) {
   let clock = 1_900_000_000;

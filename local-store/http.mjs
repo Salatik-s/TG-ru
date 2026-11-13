@@ -96,6 +96,7 @@ export function createStoreServer({ pagesHandler, publicOrigin, release, localAp
   }
   const origin = publicOrigin ? new URL(publicOrigin) : null;
   const tickets = new Map();
+  const deviceUpdateTickets = new Map();
   const clock = storeOptions.now ?? (() => Math.floor(Date.now() / 1000));
   const store = createStore(storeOptions);
   const server = createServer(async (request, response) => {
@@ -110,8 +111,38 @@ export function createStoreServer({ pagesHandler, publicOrigin, release, localAp
         return json(response, 200, { ok: true, local: true });
       }
       if (path === '/api/store/release' && request.method === 'GET' && downloadableRelease) {
-        const { version_code, version_name, min_sdk } = downloadableRelease;
-        return json(response, 200, { ok: true, version_code, version_name, min_sdk });
+        const { version_code, version_name, min_sdk, bytes, sha256 } = downloadableRelease;
+        return json(response, 200, { ok: true, version_code, version_name, min_sdk, bytes, sha256 });
+      }
+      if (path === '/api/store/device/update' && request.method === 'POST' && downloadableRelease) {
+        const data = await parseJson(request);
+        if (data.version_code !== downloadableRelease.version_code) throw new StoreError(409, 'release_changed');
+        await store.deviceAction('device/update', data);
+        const now = clock();
+        for (const [key, expiry] of deviceUpdateTickets) {
+          if (expiry <= now) deviceUpdateTickets.delete(key);
+        }
+        if (deviceUpdateTickets.size >= 4096) throw new StoreError(429, 'too_many_attempts', 60);
+        const ticket = randomBytes(32).toString('base64url');
+        deviceUpdateTickets.set(ticket, now + 60);
+        return json(response, 200, { ok: true, ticket });
+      }
+      if (path === '/api/store/device/update' && request.method === 'GET' && downloadableRelease) {
+        const ticket = request.headers.authorization?.match(/^Bearer ([a-zA-Z0-9_-]{43})$/)?.[1];
+        const expiry = deviceUpdateTickets.get(ticket);
+        if (!expiry || expiry <= clock()) throw new StoreError(403, 'download_ticket_invalid');
+        deviceUpdateTickets.delete(ticket);
+        if (publicSite) {
+          response.writeHead(200, { 'X-Accel-Redirect': '/_tg_ru_store_apk' });
+          response.end();
+          return;
+        }
+        response.writeHead(200, {
+          'Content-Type': 'application/vnd.android.package-archive',
+          'Content-Length': downloadableRelease.bytes,
+        });
+        await pipeline(createReadStream(localApk), response);
+        return;
       }
       if (path.startsWith('/form/owner/')) {
         response.setHeader('X-Robots-Tag', 'noindex, nofollow');

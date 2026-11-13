@@ -217,10 +217,30 @@ public final class FamilyStoreAccess {
     }
 
     private static String sign(KeyStore store, String challenge) throws GeneralSecurityException {
+        return sign(store, "tg-ru-store-local\n", challenge);
+    }
+
+    private static String sign(KeyStore store, String prefix, String challenge) throws GeneralSecurityException {
         Signature signer = Signature.getInstance("SHA256withECDSA");
         signer.initSign((PrivateKey) store.getKey(KEY_ALIAS, null));
-        signer.update(("tg-ru-store-local\n" + challenge).getBytes(StandardCharsets.UTF_8));
+        signer.update((prefix + challenge).getBytes(StandardCharsets.UTF_8));
         return Base64.encodeToString(signer.sign(), Base64.NO_WRAP);
+    }
+
+    static String updateTicket(Context context, long version) throws Exception {
+        if (!hasDevice(context)) throw new ActivationFailure("device_not_found");
+        String deviceId = preferences(context).getString(DEVICE_ID, "");
+        JSONObject issued = post("/api/store/device/challenge", new JSONObject().put(DEVICE_ID, deviceId));
+        String token = issued.getString("token");
+        String challenge = issued.getString("challenge");
+        if (!TOKEN.matcher(token).matches() || !TOKEN.matcher(challenge).matches()) {
+            throw new ActivationFailure("bad_response");
+        }
+        JSONObject proof = new JSONObject().put("token", token).put("version_code", version)
+                .put("signature", sign(getDeviceKey(false), "tg-ru-store-update\n" + version + "\n", challenge));
+        String ticket = post("/api/store/device/update", proof).getString("ticket");
+        if (!TOKEN.matcher(ticket).matches()) throw new ActivationFailure("bad_response");
+        return ticket;
     }
 
     private static long saveAccess(Context context, JSONObject result, byte[] publicKey)

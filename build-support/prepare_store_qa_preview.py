@@ -41,6 +41,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base", type=Path, required=True)
     parser.add_argument("--work", type=Path, required=True)
+    parser.add_argument("--device-updates", action="store_true")
     args = parser.parse_args()
     work = within_work(args.work)
     decoded = work / "decoded"
@@ -59,9 +60,10 @@ def main():
         raise ValueError("Unexpected APK version")
     generate_r(ET.parse(decoded / "res/values/public.xml"), work)
     update_intro_text(decoded)
-    metadata.write_text(versions.replace("versionCode: 10025", "versionCode: 10026")
-                        .replace("versionName: 0.1.0-preview24-store", "versionName: 0.1.0-preview25-store"), "utf-8")
-    (work / "report.json").write_text(json.dumps({"base_sha256": BASE_SHA256, "version_code": 10026}), "utf-8")
+    code, preview = (10027, 26) if args.device_updates else (10026, 25)
+    metadata.write_text(versions.replace("versionCode: 10025", f"versionCode: {code}")
+                        .replace("versionName: 0.1.0-preview24-store", f"versionName: 0.1.0-preview{preview}-store"), "utf-8")
+    (work / "report.json").write_text(json.dumps({"base_sha256": BASE_SHA256, "version_code": code}), "utf-8")
 
 
 if __name__ == "__main__":

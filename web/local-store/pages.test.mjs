@@ -254,6 +254,7 @@ test('public Store downloads require a matching logged-in session and a fresh si
   assert.equal((await request('/downloads')).headers.get('location'), '/login');
   assert.deepEqual(await (await request('/api/store/release')).json(), {
     ok: true, version_code: 10023, version_name: release.version_name, min_sdk: 24,
+    bytes: release.bytes, sha256: release.sha256,
   });
   const landing = await (await request('/')).text();
   const hero = landing.match(/<section class="wrap hero">[\s\S]*?<\/section>/)[0];

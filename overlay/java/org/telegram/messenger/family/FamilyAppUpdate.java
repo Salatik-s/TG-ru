@@ -106,31 +106,29 @@ public final class FamilyAppUpdate {
         String origin = FamilyStoreAccess.origin();
         WORKER.execute(() -> {
             String status = "Не удалось проверить обновления. Проверьте подключение и попробуйте ещё раз.";
-            boolean offerDownload = false;
+            Release update = null;
+            boolean offerWebsite = false;
             try {
                 HttpURLConnection connection = connect(origin + "/api/store/release");
                 try {
                     int code = connection.getResponseCode();
                     if (code == 404) {
                         status = "Сервер пока не сообщает версию. Актуальную сборку можно проверить в кабинете.";
-                        offerDownload = true;
+                        offerWebsite = true;
                     } else if (code == 200) {
                         JSONObject metadata = new JSONObject(new String(
                                 readBounded(connection.getInputStream(), 4096), StandardCharsets.UTF_8));
-                        long version = metadata.getLong("version_code");
-                        int minSdk = metadata.getInt("min_sdk");
-                        String name = metadata.getString("version_name");
-                        if (!metadata.getBoolean("ok") || version < 1 || version > Integer.MAX_VALUE
-                                || minSdk < 24 || minSdk > 100 || !name.matches("[A-Za-z0-9._-]{1,64}")) {
+                        if (!metadata.getBoolean("ok")) {
                             throw new UpdateFailure("Invalid Store version");
                         }
-                        if (version <= installedVersion(activity)) {
+                        Release release = new Release(metadata, true);
+                        if (release.version <= installedVersion(activity)) {
                             status = "У вас актуальная версия TG-ru.";
-                        } else if (minSdk > Build.VERSION.SDK_INT) {
+                        } else if (release.minSdk > Build.VERSION.SDK_INT) {
                             status = "Для новой версии TG-ru нужна более новая версия Android.";
                         } else {
-                            status = "Доступна версия " + name + ". Скачайте её в кабинете TG-ru.";
-                            offerDownload = true;
+                            status = "Доступна версия " + release.name + ". Android попросит подтвердить установку.";
+                            update = release;
                         }
                     }
                 } finally { connection.disconnect(); }
@@ -138,13 +136,19 @@ public final class FamilyAppUpdate {
                 // A manual check always returns feedback, including on a failed connection.
             } finally { CHECKING_STORE.set(false); }
             String message = status;
-            boolean download = offerDownload;
+            Release candidate = update;
+            boolean website = offerWebsite;
             MAIN.post(() -> {
                 if (!alive(activity)) return;
                 AlertDialog.Builder dialog = new AlertDialog.Builder(activity)
                         .setTitle("Обновления TG-ru").setMessage(message)
-                        .setNegativeButton(download ? "Позже" : "Закрыть", null);
-                if (download) dialog.setPositiveButton("Открыть загрузки", (ignored, which) -> {
+                        .setNegativeButton(candidate != null || website ? "Позже" : "Закрыть", null);
+                if (candidate != null) dialog.setPositiveButton("Скачать", (ignored, which) -> {
+                    File cached = downloaded(activity, candidate);
+                    if (cached.isFile()) verifyAndInstall(activity, candidate, cached);
+                    else download(activity, candidate, null);
+                });
+                else if (website) dialog.setPositiveButton("Открыть загрузки", (ignored, which) -> {
                     try {
                         activity.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(origin + "/downloads")));
                     } catch (RuntimeException error) {
@@ -243,12 +247,23 @@ public final class FamilyAppUpdate {
                 File directory = target.getParentFile();
                 if (!directory.isDirectory() && !directory.mkdirs()) throw new UpdateFailure("Не удалось создать файл обновления.");
                 if (directory.getUsableSpace() < release.bytes + 32L * 1024 * 1024) throw new UpdateFailure("Для обновления не хватает свободного места на телефоне.");
-                HttpURLConnection connection = connect(DOWNLOAD);
-                byte[] credential = ("tg:" + password).getBytes(StandardCharsets.UTF_8);
-                connection.setRequestProperty("Authorization", "Basic " + Base64.encodeToString(credential, Base64.NO_WRAP));
-                Arrays.fill(credential, (byte) 0);
+                boolean store = password == null;
+                HttpURLConnection connection = connect(store ? FamilyStoreAccess.origin() + "/api/store/device/update" : DOWNLOAD);
                 try {
+                    if (store) {
+                        try {
+                            connection.setRequestProperty("Authorization", "Bearer " + FamilyStoreAccess.updateTicket(activity, release.version));
+                        } catch (FamilyStoreAccess.ActivationFailure failure) {
+                            throw new UpdateFailure("Не удалось подтвердить привязку устройства или версию. Проверьте доступ и повторите проверку обновлений.");
+                        }
+                    } else {
+                        byte[] credential = ("tg:" + password).getBytes(StandardCharsets.UTF_8);
+                        connection.setRequestProperty("Authorization", "Basic " + Base64.encodeToString(credential, Base64.NO_WRAP));
+                        Arrays.fill(credential, (byte) 0);
+                    }
                     int code = connection.getResponseCode();
+                    if (store && (code == 401 || code == 403)) throw new UpdateFailure("Проверьте доступ TG-ru и привязку устройства.");
+                    if (store && code == 409) throw new UpdateFailure("Версия или доступ изменились. Проверьте обновления снова.");
                     if (code == 401) throw new UpdateFailure("Пароль скачивания не подошёл. Проверьте его и повторите попытку.");
                     if (code == 429) throw new UpdateFailure("Слишком много попыток. Повторите загрузку через минуту.");
                     if (code != 200) throw new UpdateFailure("Не удалось скачать обновление. Повторите попытку позже.");
@@ -396,13 +411,16 @@ public final class FamilyAppUpdate {
         final int minSdk;
         final String name, sha256, notes;
         Release(JSONObject json) throws Exception {
+            this(json, false);
+        }
+        Release(JSONObject json, boolean store) throws Exception {
             version = json.getLong("version_code");
             bytes = json.getLong("bytes");
             minSdk = json.getInt("min_sdk");
             name = json.getString("version_name");
             sha256 = json.getString("sha256");
             notes = json.optString("notes", "Обновление приложения. Установка по вашему выбору.");
-            if (json.getInt("schema") != 1 || !PACKAGE.equals(json.getString("package")) || !DOWNLOAD.equals(json.getString("url"))
+            if ((!store && (json.getInt("schema") != 1 || !PACKAGE.equals(json.getString("package")) || !DOWNLOAD.equals(json.getString("url"))))
                     || version < 1 || version > Integer.MAX_VALUE || bytes < 1024 || bytes > 512L * 1024 * 1024
                     || minSdk < 24 || minSdk > 100 || !name.matches("[A-Za-z0-9._+ -]{1,64}")
                     || !sha256.matches("[a-f0-9]{64}") || notes.length() > 1200) throw new UpdateFailure("Не удалось проверить сведения об обновлении.");
