@@ -15,6 +15,8 @@ import android.graphics.drawable.StateListDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.SystemClock;
 import android.text.Editable;
 import android.text.InputFilter;
@@ -70,6 +72,22 @@ public final class FamilyStoreGateActivity extends FamilyUi {
     private long nextRefreshAt;
     private ScrollView scroll;
     private View glow;
+    private boolean waitingForAccess;
+    private final Handler main = new Handler(Looper.getMainLooper());
+    private final Runnable watchAccess = new Runnable() {
+        @Override public void run() {
+            if (!waitingForAccess) return;
+            if (!working && FamilyStoreAccess.isActive(FamilyStoreGateActivity.this)) {
+                openTelegram();
+                return;
+            }
+            if (!working && !FamilyStoreAccess.hasDevice(FamilyStoreGateActivity.this)) {
+                showActivation();
+                return;
+            }
+            main.postDelayed(this, 1_000);
+        }
+    };
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
@@ -93,9 +111,22 @@ public final class FamilyStoreGateActivity extends FamilyUi {
         else super.onBackPressed();
     }
 
+    @Override protected void onResume() {
+        super.onResume();
+        if (waitingForAccess) {
+            main.removeCallbacks(watchAccess);
+            main.post(watchAccess);
+        }
+    }
+
+    @Override protected void onPause() {
+        main.removeCallbacks(watchAccess);
+        super.onPause();
+    }
+
     private void renderStart() {
         if (FamilyStoreAccess.isActive(this)) {
-            showSuccess(FamilyStoreAccess.accessUntil(this));
+            openTelegram();
         } else if (FamilyStoreAccess.hasDevice(this)) {
             showAccessStatus();
         } else if (getPreferences(MODE_PRIVATE).getBoolean(SEEN, false)) {
@@ -174,10 +205,12 @@ public final class FamilyStoreGateActivity extends FamilyUi {
         boolean expired = FamilyStoreAccess.accessUntil(this) <= System.currentTimeMillis() / 1000;
         String heading = expired ? "Доступ закончился" : "Проверка доступа";
         beginScreen(heading);
+        waitingForAccess = true;
+        main.post(watchAccess);
         mark(false);
         title(heading, expired
                 ? "Для продления доступа обратитесь в поддержку. Контакт есть в кабинете."
-                : "Проверьте соединение и повторите проверку доступа.", 24);
+                : "Когда появится интернет, приложение подключится автоматически.", 24);
         feedback = feedback();
         bottomActions();
         action("Открыть кабинет", true).setOnClickListener(view -> openBrowser("/account"));
@@ -194,17 +227,19 @@ public final class FamilyStoreGateActivity extends FamilyUi {
         card(Icon.PHONE, "Дальше", "В Telegram можно войти по номеру телефона или открыть уже добавленный аккаунт.");
         feedback = feedback();
         bottomActions();
-        action("Открыть Telegram", true).setOnClickListener(view -> {
-            if (!FamilyStoreAccess.isActive(this)) {
-                showAccessStatus();
-                return;
-            }
-            Intent intent = new Intent().setClassName(getPackageName(), LAUNCH_ACTIVITY)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-            startActivity(intent);
-            finish();
-        });
+        action("Открыть Telegram", true).setOnClickListener(view -> openTelegram());
         action("Открыть кабинет", false).setOnClickListener(view -> openBrowser("/account"));
+    }
+
+    private void openTelegram() {
+        if (!FamilyStoreAccess.isActive(this)) {
+            showAccessStatus();
+            return;
+        }
+        Intent intent = new Intent().setClassName(getPackageName(), LAUNCH_ACTIVITY)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
+        finish();
     }
 
     private void activate() {
@@ -304,6 +339,8 @@ public final class FamilyStoreGateActivity extends FamilyUi {
     }
 
     private void beginScreen(String title) {
+        waitingForAccess = false;
+        main.removeCallbacks(watchAccess);
         content.removeAllViews();
         content.requestFocus();
         scroll.scrollTo(0, 0);

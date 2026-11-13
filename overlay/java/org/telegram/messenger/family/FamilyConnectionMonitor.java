@@ -11,6 +11,7 @@ import android.os.SystemClock;
 
 import java.net.URL;
 import java.util.Arrays;
+import java.util.Objects;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -24,18 +25,19 @@ public final class FamilyConnectionMonitor {
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private static final ScheduledExecutorService IO = Executors.newSingleThreadScheduledExecutor();
     private static volatile ConnectivityManager connectivity;
+    private static Context application;
     private static volatile SharedPreferences log;
     private static volatile int telegramState;
-    private static boolean networkWasAvailable;
+    private static Network lastDefaultNetwork;
     private static String lastAccess = "";
     private static String lastNetwork = "";
 
     private FamilyConnectionMonitor() { }
 
     static void init(Context context) {
+        application = context.getApplicationContext();
         log = context.getSharedPreferences("fg_connection_diagnostics", Context.MODE_PRIVATE);
         connectivity = context.getSystemService(ConnectivityManager.class);
-        networkWasAvailable = hasNetwork();
         if (connectivity != null) {
             try {
                 connectivity.registerDefaultNetworkCallback(new ConnectivityManager.NetworkCallback() {
@@ -79,18 +81,21 @@ public final class FamilyConnectionMonitor {
     }
 
     private static void networkChanged() {
+        Network current = connectivity == null ? null : connectivity.getActiveNetwork();
         boolean online = hasNetwork();
-        boolean gainedNetwork = online && !networkWasAvailable;
-        networkWasAvailable = online;
-        FamilyAccess.reportTransportState(telegramState);
         String kind = networkKind();
-        if (!kind.equals(lastNetwork)) {
+        boolean changed = !kind.equals(lastNetwork) || !Objects.equals(current, lastDefaultNetwork);
+        lastDefaultNetwork = current;
+        if (changed) {
             lastNetwork = kind;
             record("network " + kind);
-            if (online) FamilyAccess.resumeConnection();
-        } else if (gainedNetwork) {
-            FamilyAccess.resumeConnection();
+            if (FamilyStoreAccess.isConfigured(application)) {
+                FamilyStoreAccess.networkChanged(application);
+            } else if (online) {
+                FamilyAccess.resumeConnection();
+            }
         }
+        FamilyAccess.reportTransportState(telegramState);
         FamilyBinaryGuard.refreshConnectionHeader();
     }
 
@@ -99,6 +104,9 @@ public final class FamilyConnectionMonitor {
         if (telegramState != state) record("telegram " + state);
         telegramState = state;
         FamilyAccess.reportTransportState(state);
+        if (application != null && FamilyStoreAccess.isConfigured(application)) {
+            return FamilyStoreAccess.isActive(application) ? state : hasNetwork() ? 1 : 2;
+        }
         if (!FamilyAccess.previouslyApproved() || FamilyAccess.isAllowed()) return state;
         return hasNetwork() ? 1 : 2;
     }
@@ -116,6 +124,16 @@ public final class FamilyConnectionMonitor {
     static void routeChanged(String route) { record("route " + route); }
 
     static int transportState() { return telegramState; }
+
+    static int storeTransportState() {
+        try {
+            int account = Class.forName("org.telegram.messenger.UserConfig").getField("selectedAccount").getInt(null);
+            return (Integer) Class.forName("org.telegram.tgnet.ConnectionsManager")
+                    .getMethod("native_getConnectionState", int.class).invoke(null, account);
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError ignored) {
+            return telegramState;
+        }
+    }
 
     static boolean callActive() {
         try {
