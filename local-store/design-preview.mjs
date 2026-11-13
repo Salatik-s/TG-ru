@@ -16,6 +16,9 @@ const releases = {
   '2d8b023f17602f22aa10bba633180153d3d5b1249c2806898d22338b6eddee48': {
     version_code: 10026, version_name: '0.1.0-preview25-store', released_at: '2026-11-13T06:54:41Z',
   },
+  '4840613513b29a11b7d4114b62e4750379a960c5868d7a1739a9bebe94dc66cd': {
+    version_code: 10027, version_name: '0.1.0-preview26-store', released_at: '2026-11-13T07:08:53Z',
+  },
 };
 let release;
 if (localApk) {
