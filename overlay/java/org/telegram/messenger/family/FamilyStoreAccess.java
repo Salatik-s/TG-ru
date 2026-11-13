@@ -55,6 +55,7 @@ public final class FamilyStoreAccess {
     private static final AtomicBoolean refreshStarted = new AtomicBoolean();
     private static final AtomicBoolean recoveryQueued = new AtomicBoolean();
     private static volatile ScheduledExecutorService refreshLoop;
+    private static final FamilyStoreReconnect reconnect = new FamilyStoreReconnect();
 
     private FamilyStoreAccess() { }
 
@@ -99,10 +100,15 @@ public final class FamilyStoreAccess {
             thread.setDaemon(true);
             return thread;
         });
-        refreshLoop.scheduleWithFixedDelay(() -> refreshIfNeeded(app), 0, 15, TimeUnit.SECONDS);
+        refreshLoop.scheduleWithFixedDelay(() -> refreshIfNeeded(app), 0, 3, TimeUnit.SECONDS);
     }
 
-    static void networkAvailable(Context context) {
+    static void networkChanged(Context context) {
+        reconnect.networkChanged(SystemClock.elapsedRealtime());
+        if (FamilyConnectionMonitor.hasNetwork()) requestRefresh(context);
+    }
+
+    static void requestRefresh(Context context) {
         ScheduledExecutorService loop = refreshLoop;
         if (loop == null || !hasDevice(context) || !recoveryQueued.compareAndSet(false, true)) return;
         loop.execute(() -> {
@@ -112,9 +118,13 @@ public final class FamilyStoreAccess {
     }
 
     private static void refreshIfNeeded(Context context) {
-        if (!hasDevice(context) || !FamilyConnectionMonitor.hasNetwork()
-                || (isActive(context) && allowedUntil > SystemClock.elapsedRealtime() + 30_000)) return;
-        try { refresh(context); }
+        if (!hasDevice(context) || !FamilyConnectionMonitor.hasNetwork()) return;
+        long now = SystemClock.elapsedRealtime();
+        boolean active = isActive(context);
+        if (active) reconnect.observe(FamilyConnectionMonitor.storeTransportState(), now);
+        boolean restart = active && !FamilyConnectionMonitor.callActive() && reconnect.takeRestart(now);
+        if (!restart && (active && allowedUntil > now + 30_000 || !reconnect.takeRenewal(now))) return;
+        try { refresh(context, restart); }
         catch (ActivationFailure ignored) {
             // The existing lease covers transient errors until it expires.
         }
@@ -153,7 +163,11 @@ public final class FamilyStoreAccess {
         }
     }
 
-    static synchronized long refresh(Context context) throws ActivationFailure {
+    static long refresh(Context context) throws ActivationFailure {
+        return refresh(context, false);
+    }
+
+    private static synchronized long refresh(Context context, boolean restart) throws ActivationFailure {
         if (!isConfigured(context) || !hasDevice(context)) throw new ActivationFailure("device_key_unavailable");
         try {
             KeyStore store = getDeviceKey(false);
@@ -166,7 +180,7 @@ public final class FamilyStoreAccess {
             }
             JSONObject renewed = post("/api/store/device/renew", new JSONObject()
                     .put("token", token).put("signature", sign(store, challenge)));
-            return saveAccess(context, renewed, publicKey(store));
+            return saveAccess(context, renewed, publicKey(store), restart);
         } catch (ActivationFailure failure) {
             if ("subscription_expired".equals(failure.code)) {
                 preferences(context).edit().remove(ACCESS_UNTIL).apply();
@@ -245,6 +259,11 @@ public final class FamilyStoreAccess {
 
     private static long saveAccess(Context context, JSONObject result, byte[] publicKey)
             throws JSONException, GeneralSecurityException, ActivationFailure {
+        return saveAccess(context, result, publicKey, false);
+    }
+
+    private static long saveAccess(Context context, JSONObject result, byte[] publicKey, boolean restart)
+            throws JSONException, GeneralSecurityException, ActivationFailure {
         String deviceId = result.getString(DEVICE_ID);
         byte[] digest = MessageDigest.getInstance("SHA-256").digest(publicKey);
         StringBuilder expected = new StringBuilder(digest.length * 2);
@@ -288,7 +307,9 @@ public final class FamilyStoreAccess {
         } catch (Exception invalid) {
             throw new ActivationFailure("gateway_profile_invalid");
         }
-        if ((!gateway.equals(activeGateway) || !isActive(context)) && FamilyNative.start(gateway) != 0) {
+        if (restart) reconnect.observe(FamilyConnectionMonitor.storeTransportState(), SystemClock.elapsedRealtime());
+        if ((restart && reconnect.isConnecting() && !FamilyConnectionMonitor.callActive()
+                || !gateway.equals(activeGateway) || !isActive(context)) && FamilyNative.start(gateway) != 0) {
             closeTransport();
             throw new ActivationFailure("gateway_unavailable");
         }

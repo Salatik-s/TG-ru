@@ -107,7 +107,8 @@ public final class FamilyBinaryGuard implements Application.ActivityLifecycleCal
         foreground = new WeakReference<>(activity);
         if (!canShow(activity)) redirect(activity);
         else if (activity.getClass().getName().equals(LAUNCHER)) {
-            FamilyAccess.resumeConnection();
+            if (FamilyStoreAccess.isConfigured(activity)) FamilyStoreAccess.requestRefresh(application);
+            else FamilyAccess.resumeConnection();
             activity.getWindow().getDecorView().post(() -> {
                 if (foreground.get() != activity) return;
                 refreshConnectionHeader();
