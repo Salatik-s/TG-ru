@@ -8,10 +8,10 @@ import android.text.SpannableStringBuilder;
 import android.text.TextUtils;
 
 public final class FamilyChatHeader {
+    private static final int DEFAULT = 1;
     private static final int PROFILE = 2;
-    private static final int VISIBILITY = 3;
     private static final String TITLE = "Заголовок чатов";
-    private static final String[] OPTIONS = {"TG-ru", "Telegram", "Имя в профиле", "Вас видят / Вы скрыты"};
+    private static final String[] OPTIONS = {"TG-ru", "Telegram", "Имя в профиле"};
     private static SharedPreferences preferences;
 
     private FamilyChatHeader() { }
@@ -21,8 +21,8 @@ public final class FamilyChatHeader {
     }
 
     private static int selected() {
-        int value = preferences == null ? VISIBILITY : preferences.getInt("mode", VISIBILITY);
-        return value >= 0 && value < OPTIONS.length ? value : VISIBILITY;
+        int value = preferences == null ? DEFAULT : preferences.getInt("mode", DEFAULT);
+        return value >= 0 && value < OPTIONS.length ? value : DEFAULT;
     }
 
     public static SpannableStringBuilder title(int account) {
@@ -32,9 +32,6 @@ public final class FamilyChatHeader {
         int mode = selected();
         String text = OPTIONS[mode];
         if (mode == PROFILE) text = profileName(account);
-        if (mode == VISIBILITY) {
-            text = Boolean.FALSE.equals(FamilyPrivacyActivity.flag("sendOnlinePackets")) ? "Вы скрыты" : "Вас видят";
-        }
         return new SpannableStringBuilder(text);
     }
 
@@ -70,7 +67,7 @@ public final class FamilyChatHeader {
                     .setTitle(TITLE)
                     .setSingleChoiceItems(OPTIONS, selected(), (view, choice) -> {
                         preferences.edit().putInt("mode", choice).apply();
-                        FamilyFeatures.refreshVisibilityTitle();
+                        FamilyFeatures.refreshChatTitle();
                         if (onChanged != null) onChanged.run();
                         view.dismiss();
                     })

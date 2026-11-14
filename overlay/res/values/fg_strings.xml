@@ -19,7 +19,6 @@
   <string name="fg_check_status">Проверить статус</string>
   <string name="fg_device_approved">Устройство одобрено</string>
   <string name="fg_no_fresh_data">Нет свежих данных</string>
-  <string name="fg_privacy_title">Дополнительная приватность</string>
   <string name="fg_local_history">Локальная история</string>
   <string name="fg_access_revoked">Семейный доступ отозван</string>
 </resources>

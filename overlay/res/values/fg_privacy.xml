@@ -1,25 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-  <string name="fg_ghost_settings_title">Настройки призрака</string>
-  <string name="fg_privacy_summary">Невидимость, прочтение и удалённые сообщения</string>
-  <string name="fg_privacy_intro">Выберите, что собеседники смогут видеть. Изменения сохраняются сразу.</string>
-  <string name="fg_ghost_master">Режим призрака</string>
-  <string name="fg_ghost_master_summary">Включает все способы скрыть вашу активность. Каждый из них можно настроить отдельно ниже.</string>
-  <string name="fg_hide_online">Скрывать статус «в сети»</string>
-  <string name="fg_hide_online_summary">Приложение не сообщает Telegram, что вы сейчас в сети.</string>
-  <string name="fg_hide_read">Не отмечать сообщения прочитанными</string>
-  <string name="fg_hide_read_summary">При открытии чата не отправляется отметка о прочтении.</string>
-  <string name="fg_hide_typing">Скрывать набор текста</string>
-  <string name="fg_hide_typing_summary">Собеседники не видят «печатает», запись голоса и другие индикаторы действий.</string>
-  <string name="fg_hide_stories">Скрывать просмотр историй</string>
-  <string name="fg_hide_stories_summary">Просмотр истории не отмечается с этого приложения.</string>
-  <string name="fg_offline_after">Возвращать статус «не в сети»</string>
-  <string name="fg_offline_after_summary">Отправлять статус «не в сети», если он всё же изменился.</string>
-  <string name="fg_deleted_heading">Удалённые сообщения</string>
-  <string name="fg_deleted_description">Сохраняйте полученные сообщения на этом телефоне, чтобы видеть их после удаления.</string>
-  <string name="fg_deleted_where">Где посмотреть: откройте нужный чат → ⋮ → «Просмотреть удалённые». История содержит только сообщения из выбранного чата.</string>
-  <string name="fg_privacy_limit">Эти настройки действуют только в TG-ru. Другие приложения и устройства могут показывать вашу активность. Уже отправленные отметки о прочтении отменить нельзя.</string>
-  <string name="fg_privacy_error">Не удалось сохранить настройку. Попробуйте ещё раз.</string>
   <string name="fg_system_title">Системные настройки</string>
   <string name="fg_system_summary">Подключение и дополнительные параметры</string>
   <string name="fg_system_intro">Для обычной переписки ничего менять здесь не нужно.</string>
