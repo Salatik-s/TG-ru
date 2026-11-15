@@ -45,8 +45,6 @@ final class PluginSmokeScene: UIResponder, UIWindowSceneDelegate {
     }
 
     private func exercise(_ controller: TgruPluginController, _ navigation: UINavigationController) {
-        UIView.setAnimationsEnabled(false)
-        defer { UIView.setAnimationsEnabled(true) }
         do {
             controller.loadViewIfNeeded()
             try check(controller.title == "Плагины TG-ru", "Plugin screen rendered")
@@ -58,7 +56,16 @@ final class PluginSmokeScene: UIResponder, UIWindowSceneDelegate {
             guard let detail = navigation.topViewController as? UITableViewController, detail !== controller else {
                 throw Failed(detail: "Plugin details did not open")
             }
-            detail.loadViewIfNeeded()
+            // A push sets topViewController before UIKit attaches its view. A user
+            // cannot tap a template until that transition has finished.
+            waitUntil("Plugin details attached after navigation", condition: {
+                detail.viewIfLoaded?.window != nil && navigation.transitionCoordinator == nil
+            }) { [weak self] in self?.exerciseDetails(detail, navigation) }
+        } catch { finish(error: String(describing: error)) }
+    }
+
+    private func exerciseDetails(_ detail: UITableViewController, _ navigation: UINavigationController) {
+        do {
             try check(detail.tableView(detail.tableView, numberOfRowsInSection: 1) == 2, "Both templates available")
             let cell = detail.tableView(detail.tableView, cellForRowAt: IndexPath(row: 0, section: 0))
             guard let toggle = cell.accessoryView as? UISwitch else { throw Failed(detail: "Enable switch missing") }
@@ -70,16 +77,43 @@ final class PluginSmokeScene: UIResponder, UIWindowSceneDelegate {
             toggle.sendActions(for: .valueChanged)
             try check(store.plugins()[0].enabled, "Enable persisted")
             detail.tableView.delegate?.tableView?(detail.tableView, didSelectRowAt: IndexPath(row: 0, section: 1))
+            waitUntil("Template preview presented", condition: {
+                guard let preview = detail.presentedViewController as? UIAlertController else { return false }
+                return preview.viewIfLoaded?.window != nil && !preview.isBeingPresented
+            }) { [weak self] in self?.verifyPreview(detail, navigation) }
+        } catch { finish(error: String(describing: error)) }
+    }
+
+    private func verifyPreview(_ detail: UITableViewController, _ navigation: UINavigationController) {
+        do {
             guard let preview = detail.presentedViewController as? UIAlertController else {
-                throw Failed(detail: "Template preview missing")
+                throw Failed(detail: "Template preview missing after presentation")
             }
             try check(preview.message == "Привет!", "Template content shown")
             try check(preview.actions.contains { $0.title == "Скопировать" }, "Explicit copy action offered")
-            preview.dismiss(animated: false)
-            navigation.popToRootViewController(animated: false)
-            try check(store.plugins().count == 1, "Plugin retained after reopening")
-            finish(error: nil)
+            preview.dismiss(animated: false) { [weak self] in
+                guard let self else { return }
+                navigation.popToRootViewController(animated: false)
+                do {
+                    try self.check(self.store.plugins().count == 1, "Plugin retained after reopening")
+                    self.finish(error: nil)
+                } catch { self.finish(error: String(describing: error)) }
+            }
         } catch { finish(error: String(describing: error)) }
+    }
+
+    private func waitUntil(_ description: String, remaining: Int = 50,
+                           condition: @escaping () -> Bool, completion: @escaping () -> Void) {
+        if condition() {
+            checks.append(description)
+            completion()
+        } else if remaining == 0 {
+            finish(error: "Timed out: " + description)
+        } else {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                self?.waitUntil(description, remaining: remaining - 1, condition: condition, completion: completion)
+            }
+        }
     }
 
     private func finish(error: String?) {
