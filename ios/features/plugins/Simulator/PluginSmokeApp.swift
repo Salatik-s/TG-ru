@@ -14,28 +14,35 @@ final class PluginSmokeScene: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
     private var checks: [String] = []
     private let store = TgruPluginStore()
+    private var download: TgruPluginDownload?
 
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         guard let scene = scene as? UIWindowScene else { return }
         let window = UIWindow(windowScene: scene)
         self.window = window
-        do {
-            UserDefaults.standard.removeObject(forKey: "tgru.plugins.v1")
-            let source = try TgruPluginSource("https://github.com/test-author/test-plugin/blob/\(String(repeating: "a", count: 40))/tgru-plugin.json")
-            let data = try JSONSerialization.data(withJSONObject: [
-                "schemaVersion": 1, "id": "smoke-test", "name": "Быстрые ответы",
-                "version": "1.0.0", "description": "Проверка плагинов TG-ru",
-                "templates": [["name": "Приветствие", "text": "Привет!"], ["name": "Ответ", "text": "Спасибо, отвечу позже."]]
-            ])
-            try store.save(TgruInstalledPlugin(source: source, manifest: TgruPluginManifest.parse(data), enabled: true))
-            let controller = TgruPluginController()
-            let navigation = UINavigationController(rootViewController: controller)
-            window.rootViewController = navigation
-            window.makeKeyAndVisible()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
-                self?.exercise(controller, navigation)
-            }
-        } catch { finish(error: String(describing: error)) }
+        window.rootViewController = UIViewController()
+        window.makeKeyAndVisible()
+        UserDefaults.standard.removeObject(forKey: "tgru.plugins.v1")
+        download = TgruPluginDownload(repository: ("Salatik-s", "TG-ru-plugins")) { [weak self] result in
+            guard let self else { return }
+            self.download = nil
+            do {
+                let (source, manifest) = try result.get()
+                try self.check(manifest.id == "quick-replies", "Public GitHub repository returned the example manifest")
+                try self.store.save(TgruInstalledPlugin(source: source, manifest: manifest, enabled: true))
+                self.showPlugins(window)
+            } catch { self.finish(error: String(describing: error)) }
+        }
+        download?.start()
+    }
+
+    private func showPlugins(_ window: UIWindow) {
+        let controller = TgruPluginController()
+        let navigation = UINavigationController(rootViewController: controller)
+        window.rootViewController = navigation
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
+            self?.exercise(controller, navigation)
+        }
     }
 
     private struct Failed: Error { let detail: String }
@@ -50,7 +57,7 @@ final class PluginSmokeScene: UIResponder, UIWindowSceneDelegate {
             try check(controller.title == "Плагины TG-ru", "Plugin screen rendered")
             try check(controller.tableView(controller.tableView, numberOfRowsInSection: 1) == 1, "Installed manifest displayed")
             let sourceRow = controller.tableView(controller.tableView, cellForRowAt: IndexPath(row: 0, section: 1))
-            try check(sourceRow.detailTextLabel?.text?.contains("test-author/test-plugin") == true, "Source and version visible")
+            try check(sourceRow.detailTextLabel?.text?.lowercased().contains("salatik-s/tg-ru-plugins") == true, "Source and version visible")
             controller.tableView(controller.tableView, didSelectRowAt: IndexPath(row: 0, section: 1))
             navigation.view.layoutIfNeeded()
             guard let detail = navigation.topViewController as? UITableViewController, detail !== controller else {
@@ -66,7 +73,7 @@ final class PluginSmokeScene: UIResponder, UIWindowSceneDelegate {
 
     private func exerciseDetails(_ detail: UITableViewController, _ navigation: UINavigationController) {
         do {
-            try check(detail.tableView(detail.tableView, numberOfRowsInSection: 1) == 2, "Both templates available")
+            try check(detail.tableView(detail.tableView, numberOfRowsInSection: 1) == 3, "All three templates available")
             let cell = detail.tableView(detail.tableView, cellForRowAt: IndexPath(row: 0, section: 0))
             guard let toggle = cell.accessoryView as? UISwitch else { throw Failed(detail: "Enable switch missing") }
             toggle.isOn = false
@@ -89,7 +96,7 @@ final class PluginSmokeScene: UIResponder, UIWindowSceneDelegate {
             guard let preview = detail.presentedViewController as? UIAlertController else {
                 throw Failed(detail: "Template preview missing after presentation")
             }
-            try check(preview.message == "Привет!", "Template content shown")
+            try check(preview.message == "Получил, спасибо! Посмотрю и вернусь с ответом.", "Template content shown")
             try check(preview.actions.contains { $0.title == "Скопировать" }, "Explicit copy action offered")
             preview.dismiss(animated: false) { [weak self] in
                 guard let self else { return }
