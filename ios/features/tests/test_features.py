@@ -74,7 +74,7 @@ class PinnedIntegration(unittest.TestCase):
             self.assertIn('familyTranscribeAudio(', changes[path])
             self.assertIn('storeLocallyTranscribedAudio(', changes[path])
         self.assertIn('let language', changes[p.TEXT])
-        self.assertIn('defaultTitle = "S.A.A."', changes[p.CHAT_LIST])
+        self.assertIn('defaultTitle = "TG-ru"', changes[p.CHAT_LIST])
         self.assertIn('parentController?.openFamilyFeatureSettings()', changes[p.CHAT_LIST])
         self.assertIn('self.present(navigation, animated: true)', changes[p.CHAT_LIST])
         self.assertIn('self?.parentController?.composePressed()', changes[p.CHAT_LIST])

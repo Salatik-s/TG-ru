@@ -26,7 +26,13 @@ def main():
         for mode in [[], ['-D', 'FAMILY_COMPILE_ONLY']]:
             run(*common, '-typecheck', '-module-name', 'FamilyUI', '-I', output, *mode,
                 *sorted((ROOT / 'family-ui/Sources/FamilyUI').glob('*.swift')))
+        run(*common, '-typecheck', '-module-name', 'TgruPluginUI',
+            ROOT / 'features/plugins/Sources/TgruPlugin.swift',
+            ROOT / 'features/plugins/TgruPluginDownload.swift',
+            ROOT / 'features/plugins/TgruPluginController.swift',
+            ROOT / 'features/settings/FamilyFeatureSettingsController.swift')
     print('NATIVE_GATE_IOS_SIMULATOR_TYPECHECK_PASS: own-api and compile-only; real Core/lease')
+    print('PLUGIN_IOS_SIMULATOR_TYPECHECK_PASS: manifest, download and UIKit screens')
     print('Transport Apple adapter and full Telegram linking remain separate build requirements')
 
 

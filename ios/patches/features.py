@@ -122,8 +122,8 @@ def transformed(snapshot=FEATURES / 'upstream'):
 ''')
     result[TEXT] = source
     source = read(CHAT_LIST)
-    source = replace_one(source, '                title = self.presentationData.strings.DialogList_Title\n', '                title = "S.A.A."\n')
-    source = replace_one(source, '                defaultTitle = presentationData.strings.DialogList_Title\n', '                defaultTitle = "S.A.A."\n')
+    source = replace_one(source, '                title = self.presentationData.strings.DialogList_Title\n', '                title = "TG-ru"\n')
+    source = replace_one(source, '                defaultTitle = presentationData.strings.DialogList_Title\n', '                defaultTitle = "TG-ru"\n')
     source = replace_one(source, '    var proxyButton: NavigationBarComponent.Button?\n', '    var familyButton: NavigationBarComponent.Button?\n    var proxyButton: NavigationBarComponent.Button?\n')
     source = replace_one(source, '        if let storyButton = self.storyButton {\n', '        if let familyButton = self.familyButton { result.append(familyButton) }\n        if let storyButton = self.storyButton {\n')
     source = replace_one(source, '        let defaultTitle: String\n', '        self.familyButton = nil\n        let defaultTitle: String\n')
@@ -153,6 +153,9 @@ def transformed(snapshot=FEATURES / 'upstream'):
     return result
 
 HELPERS = {
+    'plugins/Sources/TgruPlugin.swift': 'submodules/ChatListUI/Sources/TgruPlugin.swift',
+    'plugins/TgruPluginDownload.swift': 'submodules/ChatListUI/Sources/TgruPluginDownload.swift',
+    'plugins/TgruPluginController.swift': 'submodules/ChatListUI/Sources/TgruPluginController.swift',
     'speech/FamilyLocalSpeech.swift': 'submodules/Media/LocalAudioTranscription/Sources/FamilyLocalSpeech.swift',
     'documents/FamilyPDFController.swift': 'submodules/TelegramUI/Sources/FamilyPDFController.swift',
     'settings/FamilyFeatureSettingsController.swift': 'submodules/ChatListUI/Sources/FamilyFeatureSettingsController.swift',

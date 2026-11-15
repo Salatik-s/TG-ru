@@ -7,14 +7,17 @@
     "submodules/TelegramUI/Components/Chat/ChatMessageInteractiveInstantVideoNode/BUILD": "e1a99f996ae30634451a381171495886cecc4f9855b17de0331a4eadb30ce6cb",
     "submodules/TelegramUI/Sources/DocumentPreviewController.swift": "bef0e70b0aba93f00a92a99b6c9dc3b51832647fdeab08b69a82a6641007586c",
     "submodules/TelegramUI/Components/Chat/ChatMessageTextBubbleContentNode/Sources/ChatMessageTextBubbleContentNode.swift": "309547f7ececde8a97e2421a690e72d5d3d211f3dd4b9cc1b197dcb5e174918f",
-    "submodules/ChatListUI/Sources/ChatListController.swift": "904e4fe0ae5942a6f24bc1d6569b485178a4c26938a4411e265f2e7770e6e592",
+    "submodules/ChatListUI/Sources/ChatListController.swift": "a51f4a9bde1a00d7eb2187b4e08598e077c4f96d8322e56ba7a940fd082a93d0",
     "submodules/ChatListUI/BUILD": "1fa16fef6c51bedb82a985780b18ef92663b9b02b81cc0afbb2b7dce192f7cc0"
   },
   "helpers": {
     "speech/FamilyLocalSpeech.swift": "6754327750d4d7acc69d5783c1ca922fe2029526769478f271101604c4bf661c",
     "documents/FamilyPDFController.swift": "6a3b51e21dd53a1735477fdd6ce1b22eef6f3f1ab0c83473648991f76191e69a",
-    "settings/FamilyFeatureSettingsController.swift": "d0efebc1b6e51ac25ab34843da74107ed334752632ef59d4a3099dfc0316416c",
+    "settings/FamilyFeatureSettingsController.swift": "2fa6ebc94b4a0b69dbe1ed4eb5c85e6efdd1d89aa8c50f4ec72d0a4808ab5240",
     "python/FamilyPythonInlineView.swift": "b9c858a7597d6fbf2770b43f4fa63e9d909daf97af03d4a162e7bf5a3b7e2aa6",
-    "tests/FeaturesUIContracts.swift": "dd23196fa51cc82b81f96cd511c912b8a57bcdd642515bb9d6601c2cf8fcaffc"
+    "tests/FeaturesUIContracts.swift": "0895e79ed598ea17a293080ee2f8279815274d5bdfedd4482401222703574bc4",
+    "plugins/Sources/TgruPlugin.swift": "7de89fb598378fb306d3acf857e4da15e0a7b806818b7f3ede3a2b6b36e4d293",
+    "plugins/TgruPluginDownload.swift": "05e2531704e5ad90b157ff2e3e023eb3cf5dd12cf732275f455d993ce208fb6b",
+    "plugins/TgruPluginController.swift": "60a5728569ff686aa506753eb8a70a730ca2383317ec4cf7e9f50200ffbccdf2"
   }
 }

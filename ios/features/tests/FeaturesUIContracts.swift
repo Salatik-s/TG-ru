@@ -29,19 +29,16 @@ final class FeaturesUIContracts: XCTestCase {
         for (feature, value) in privacySaved { FamilyPrivacySettings.shared.setEnabled(value, for: feature) }
         privacySaved.removeAll()
     }
-    @MainActor func testPrivacySwitchesUseTheRealPolicyAndArchiveIsReachable() throws {
+    @MainActor func testRetiredControlsAreAbsent() {
         let settings = FamilyFeatureSettingsController(accountID: "qa-account")
-        let navigation = UINavigationController(rootViewController: settings)
         settings.loadViewIfNeeded()
-        for (index, feature) in FamilyPrivacyFeature.allCases.enumerated() {
-            let cell = settings.tableView(settings.tableView, cellForRowAt: IndexPath(row: 0, section: 3 + index))
-            let toggle = try XCTUnwrap(cell.accessoryView as? UISwitch)
-            XCTAssertFalse(toggle.isOn)
-            toggle.isOn = true; toggle.sendActions(for: .valueChanged)
-            XCTAssertTrue(FamilyPrivacySettings.shared.isEnabled(feature))
+        for section in 0..<settings.numberOfSections(in: settings.tableView) {
+            let cell = settings.tableView(settings.tableView, cellForRowAt: IndexPath(row: 0, section: section))
+            let label = cell.textLabel?.text ?? ""
+            XCTAssertFalse(label.contains("Удалённые"))
+            XCTAssertFalse(label.contains("Не отправлять"))
+            XCTAssertFalse(label.contains("Сохранять удалённый"))
         }
-        settings.tableView(settings.tableView, didSelectRowAt: IndexPath(row: 0, section: 8))
-        XCTAssertEqual(navigation.viewControllers.count, 2)
     }
     @MainActor func testNativeSettingsAreReachableAndOptIn() throws {
         let settings = FamilyFeatureSettingsController(accountID: "qa-account")
@@ -49,10 +46,10 @@ final class FeaturesUIContracts: XCTestCase {
         navigation.loadViewIfNeeded(); settings.loadViewIfNeeded()
         XCTAssertEqual(navigation.viewControllers.first, settings)
         XCTAssertEqual(settings.title, "Дополнения")
-        XCTAssertEqual(settings.numberOfSections(in: settings.tableView), 9)
+        XCTAssertEqual(settings.numberOfSections(in: settings.tableView), 5)
         XCTAssertNotNil(settings.navigationItem.leftBarButtonItem)
         for section in keys.indices {
-            let cell = settings.tableView(settings.tableView, cellForRowAt: IndexPath(row: 0, section: section))
+            let cell = settings.tableView(settings.tableView, cellForRowAt: IndexPath(row: 0, section: section + 1))
             let toggle = try XCTUnwrap(cell.accessoryView as? UISwitch)
             XCTAssertFalse(toggle.isOn)
             XCTAssertFalse(try XCTUnwrap(toggle.accessibilityLabel).isEmpty)
@@ -61,18 +58,29 @@ final class FeaturesUIContracts: XCTestCase {
         }
         let reopened = FamilyFeatureSettingsController(accountID: "qa-account"); reopened.loadViewIfNeeded()
         for section in keys.indices {
-            let cell = reopened.tableView(reopened.tableView, cellForRowAt: IndexPath(row: 0, section: section))
+            let cell = reopened.tableView(reopened.tableView, cellForRowAt: IndexPath(row: 0, section: section + 1))
             XCTAssertTrue(try XCTUnwrap(cell.accessoryView as? UISwitch).isOn)
         }
     }
     @MainActor func testDynamicTypeAndUnsupportedFeaturesAreNotAdvertised() throws {
         let settings = FamilyFeatureSettingsController(accountID: "qa-account"); settings.loadViewIfNeeded()
         for section in keys.indices {
-            let cell = settings.tableView(settings.tableView, cellForRowAt: IndexPath(row: 0, section: section))
+            let cell = settings.tableView(settings.tableView, cellForRowAt: IndexPath(row: 0, section: section + 1))
             XCTAssertEqual(cell.textLabel?.numberOfLines, 0)
             XCTAssertEqual(cell.textLabel?.adjustsFontForContentSizeCategory, true)
             XCTAssertFalse((cell.textLabel?.text ?? "").lowercased().contains("ghost"))
             XCTAssertFalse((cell.textLabel?.text ?? "").lowercased().contains("плагин"))
         }
+    }
+    @MainActor func testPluginSectionOpensNativeInstaller() throws {
+        let settings = FamilyFeatureSettingsController(accountID: "qa-account")
+        let navigation = UINavigationController(rootViewController: settings)
+        settings.loadViewIfNeeded()
+        let cell = settings.tableView(settings.tableView, cellForRowAt: IndexPath(row: 0, section: 0))
+        XCTAssertEqual(cell.textLabel?.text, "Плагины TG-ru")
+        settings.tableView(settings.tableView, didSelectRowAt: IndexPath(row: 0, section: 0))
+        XCTAssertEqual(navigation.viewControllers.count, 2)
+        navigation.topViewController?.loadViewIfNeeded()
+        XCTAssertEqual(navigation.topViewController?.title, "Плагины TG-ru")
     }
 }

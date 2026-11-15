@@ -10,14 +10,18 @@ public final class FamilyPrivacySettings {
     public static let changed = Notification.Name("FamilyPrivacySettingsChanged")
     private let defaults: UserDefaults
     private let lock = NSLock()
-    public init(defaults: UserDefaults) { self.defaults = defaults }
+    public init(defaults: UserDefaults) {
+        self.defaults = defaults
+        // Retired settings from older builds must not alter Telegram behavior.
+        for feature in FamilyPrivacyFeature.allCases { defaults.removeObject(forKey: key(feature)) }
+    }
     private func key(_ feature: FamilyPrivacyFeature) -> String { "family.privacy.v1." + feature.rawValue }
     public func isEnabled(_ feature: FamilyPrivacyFeature) -> Bool {
         lock.lock(); defer { lock.unlock() }
-        return defaults.bool(forKey: key(feature))
+        return false
     }
     public func setEnabled(_ enabled: Bool, for feature: FamilyPrivacyFeature) {
-        lock.lock(); defaults.set(enabled, forKey: key(feature)); lock.unlock()
+        lock.lock(); defaults.removeObject(forKey: key(feature)); lock.unlock()
         NotificationCenter.default.post(name: Self.changed, object: self)
     }
     /// Exact RPC names only. Read eligibility comes from the Postbox transaction;
