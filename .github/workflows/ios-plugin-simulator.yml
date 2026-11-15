@@ -1,0 +1,33 @@
+name: TG-ru plugin iPhone Simulator
+on:
+  push:
+    branches: [sukhovskiy.a.a/ios-plugin-simulator]
+    paths:
+      - .github/workflows/ios-plugin-simulator.yml
+      - ios/features/plugins/**
+      - ios/build-support/plugin_simulator_smoke.py
+permissions:
+  contents: read
+concurrency:
+  group: ios-plugin-simulator
+  cancel-in-progress: true
+jobs:
+  plugins:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Check manifest and plugin storage
+        run: swift test --package-path ios/features/plugins
+      - name: Launch actual plugin screens on iPhone Simulator
+        run: python3 ios/build-support/plugin_simulator_smoke.py
+      - name: Upload simulator evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: tg-ru-plugin-simulator
+          path: ios/dist/plugin-simulator/
+          if-no-files-found: warn
+          retention-days: 7
