@@ -20,7 +20,7 @@
     },
     {
       "path": "patches/features.py",
-      "sha256": "1be271be94ffe570b147e679013c3f647150c4cb40af472e578f1568edd0d4d5",
+      "sha256": "f9080f7c059565887636714510759c8e0c82b52d631750bd0cf41be179286826",
       "args": [
         "--checkout",
         "{upstream}"
